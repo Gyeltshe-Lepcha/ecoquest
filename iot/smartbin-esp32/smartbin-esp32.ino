@@ -192,10 +192,8 @@
 
 //   wasteCount = 0;
 //   binFull = false;
-//   lidOpenedByUltrasonic = false;
 //   obstacleLeftTime = 0;
 //   lastWasteDetectTime = 0;
-//   closeLid();
 //   updateBinStatusLED();
 
 //   challengeArmed = activeMissionId.length() > 0 && activeExpectedLabel.length() > 0;
@@ -221,6 +219,9 @@
 //     Serial.println("Person/Object already near dustbin. Opening lid through servo.");
 //     openLid();
 //     lidOpenedByUltrasonic = true;
+//   } else {
+//     closeLid();
+//     lidOpenedByUltrasonic = false;
 //   }
 
 //   String response = "{";
@@ -584,13 +585,6 @@
 //     return;
 //   }
 
-//   if (!challengeArmed) {
-//     lidOpenedByUltrasonic = false;
-//     closeLid();
-//     delay(300);
-//     return;
-//   }
-
 //   long distance = getDistanceCM();
 
 //   Serial.print("Distance: ");
@@ -618,6 +612,11 @@
 //         obstacleLeftTime = 0;
 //       }
 //     }
+//   }
+
+//   if (!challengeArmed) {
+//     delay(300);
+//     return;
 //   }
 
 //   if (lidOpen && lidOpenedByUltrasonic) {

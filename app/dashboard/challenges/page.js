@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   CheckCircle2,
@@ -18,10 +18,12 @@ import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { challenges as challengeSeed } from '@/lib/ecoquest-data';
 
+const ITEMS_PER_CHALLENGE = 5;
+
 const emptyProgress = {
   progress: 0,
   completed_count: 0,
-  goal_count: 1,
+  goal_count: ITEMS_PER_CHALLENGE,
   status: 'active',
 };
 
@@ -61,13 +63,21 @@ function targetTone(label) {
   }
 }
 
-function PointsUpdateSection({ data, activeMission, error }) {
+function PointsUpdateSection({ data, activeMission, latestReward, error }) {
   const totalPoints = Number(data?.profile?.eco_points ?? 0);
   const latest = data?.latest;
-  const isCorrect = activeMission?.status === 'correct';
-  const expectedLabel = activeMission?.result?.expected_label ?? activeMission?.expected_label ?? 'target';
-  const detectedLabel = activeMission?.result?.detected_label ?? latest?.label ?? null;
-  const pointsAwarded = Number(activeMission?.points_awarded ?? 0);
+  const isCorrect = Boolean(latestReward) || activeMission?.status === 'correct';
+  const expectedLabel =
+    latestReward?.expected_label ??
+    activeMission?.result?.expected_label ??
+    activeMission?.expected_label ??
+    'target';
+  const detectedLabel =
+    latestReward?.detected_label ??
+    activeMission?.result?.detected_label ??
+    latest?.label ??
+    null;
+  const pointsAwarded = Number(latestReward?.points_awarded ?? activeMission?.points_awarded ?? 0);
 
   return (
     <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm">
@@ -166,7 +176,7 @@ function ChallengeCard({ challenge, onTake, activeMission }) {
 
               <div className="shrink-0 text-right">
                 <div className="text-2xl font-bold text-primary">+{challenge.points_value}</div>
-                <div className="text-xs text-muted-foreground">points</div>
+                <div className="text-xs text-muted-foreground">per item</div>
               </div>
             </div>
 
@@ -191,7 +201,7 @@ function ChallengeCard({ challenge, onTake, activeMission }) {
               {!completed && (
                 <Button onClick={() => onTake(challenge)} disabled={missionActive} className="gap-2">
                   <Target className="h-4 w-4" />
-                  {missionActive ? 'Waiting...' : 'Take Challenge'}
+                  {missionActive ? 'Listening...' : 'Take Challenge'}
                 </Button>
               )}
             </div>
@@ -239,7 +249,7 @@ function MissionStatusPanel({ mission, error, onReset }) {
             {mission?.challenge_title ?? 'SmartBin mission'}
           </h2>
           <p className="mt-1 text-sm font-semibold text-slate-600">
-            Mission: place one <span className="capitalize text-emerald-700">{expected}</span> item into the physical SmartBin.
+            Mission: place 5 <span className="capitalize text-emerald-700">{expected}</span> items into the physical SmartBin.
           </p>
         </div>
 
@@ -263,7 +273,7 @@ function MissionStatusPanel({ mission, error, onReset }) {
             'Web sends mission command to ESP32 DevKit',
             'Ultrasonic waits for person within 25 cm',
             'IR detects object, then DevKit calls backend',
-            'Backend captures ESP32-CAM image and AI verifies target',
+            'Backend verifies, points update, then web re-arms until 5 correct items',
           ].map((copy, index) => (
             <div key={copy} className="rounded-xl bg-white p-3 text-sm font-semibold text-sky-800 shadow-sm">
               <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-xs font-black">{index + 1}</span>
@@ -295,7 +305,7 @@ function MissionStatusPanel({ mission, error, onReset }) {
               </div>
               <p className={`mt-3 text-sm font-semibold ${isCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
                 {isCorrect
-                  ? 'Correct item. The card is now filled and EcoPoints were added.'
+                  ? 'Correct item. EcoPoints were added and this challenge continues until 5 matching items are verified.'
                   : 'The item did not match the challenge target or confidence threshold. Try the same mission again.'}
               </p>
             </>
@@ -319,6 +329,12 @@ export default function ChallengesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [dashboardData, setDashboardData] = useState(null);
   const [pointsError, setPointsError] = useState('');
+  const [latestReward, setLatestReward] = useState(null);
+  const processedMissionIds = useRef(new Set());
+  const sessionRef = useRef({
+    challengeId: null,
+    correctCount: 0,
+  });
 
   async function loadDashboardData() {
     try {
@@ -367,11 +383,48 @@ export default function ChallengesPage() {
 
         if (!alive || !response.ok || !result.mission) return;
 
+        const finished = result.mission.status === 'correct' || result.mission.status === 'try_again';
+        const alreadyProcessed = processedMissionIds.current.has(result.mission.mission_id);
+
         setActiveMission(result.mission);
 
-        if (result.mission.status === 'correct') {
-          fillChallenge(result.mission.challenge_id);
-          loadDashboardData();
+        if (finished && !alreadyProcessed) {
+          processedMissionIds.current.add(result.mission.mission_id);
+
+          const session = sessionRef.current;
+          const currentCorrectCount = session.challengeId === result.mission.challenge_id
+            ? session.correctCount
+            : 0;
+          const nextCorrectCount = result.mission.status === 'correct'
+            ? Math.min(currentCorrectCount + 1, ITEMS_PER_CHALLENGE)
+            : currentCorrectCount;
+
+          sessionRef.current = {
+            challengeId: result.mission.challenge_id,
+            correctCount: nextCorrectCount,
+          };
+
+          if (result.mission.status === 'correct') {
+            countVerifiedItem(result.mission.challenge_id, nextCorrectCount);
+            setLatestReward({
+              challenge_id: result.mission.challenge_id,
+              expected_label: result.mission.result?.expected_label ?? result.mission.expected_label,
+              detected_label: result.mission.result?.detected_label ?? null,
+              points_awarded: result.mission.points_awarded ?? 0,
+            });
+            loadDashboardData();
+          }
+
+          const challenge = challengeSeed.find((item) => item.challenge_id === result.mission.challenge_id);
+          if (challenge && nextCorrectCount < ITEMS_PER_CHALLENGE) {
+            window.setTimeout(() => {
+              startChallenge(challenge, {
+                pendingMessage: result.mission.status === 'correct'
+                  ? 'Correct item logged. Re-arming ESP32 DevKit for the next item...'
+                  : 'Try again logged. Re-arming ESP32 DevKit for another attempt...',
+              });
+            }, 600);
+          }
         }
       } catch {
         if (alive) {
@@ -401,17 +454,26 @@ export default function ChallengesPage() {
 
   const activeChallenges = filteredItems.filter((challenge) => challenge.status !== 'completed');
   const completedChallenges = filteredItems.filter((challenge) => challenge.status === 'completed');
-  const availablePoints = activeChallenges.reduce((sum, challenge) => sum + challenge.points_value, 0);
+  const availablePoints = activeChallenges.reduce((sum, challenge) => {
+    const remaining = Math.max(0, Number(challenge.goal_count ?? ITEMS_PER_CHALLENGE) - Number(challenge.completed_count ?? 0));
+    return sum + (remaining * Number(challenge.points_value ?? 0));
+  }, 0);
 
-  function fillChallenge(challengeId) {
+  function countVerifiedItem(challengeId, nextCount) {
     setItems((current) => current.map((challenge) => (
       challenge.challenge_id === challengeId
-        ? { ...challenge, status: 'completed', progress: 100, completed_count: 1 }
+        ? {
+            ...challenge,
+            status: nextCount >= ITEMS_PER_CHALLENGE ? 'completed' : 'active',
+            progress: Math.min(100, Math.round((nextCount / ITEMS_PER_CHALLENGE) * 100)),
+            completed_count: nextCount,
+            goal_count: ITEMS_PER_CHALLENGE,
+          }
         : challenge
     )));
   }
 
-  async function takeChallenge(challenge) {
+  async function startChallenge(challenge, options = {}) {
     const expectedLabel = getExpectedLabel(challenge);
 
     setMissionError('');
@@ -426,7 +488,7 @@ export default function ChallengesPage() {
       started_at: new Date().toISOString(),
       devkit: {
         status: 'pending',
-        message: 'Sending start command to ESP32 DevKit...',
+        message: options.pendingMessage ?? 'Sending start command to ESP32 DevKit...',
       },
       result: null,
     });
@@ -453,6 +515,15 @@ export default function ChallengesPage() {
       setMissionError(error.message);
       setActiveMission(null);
     }
+  }
+
+  async function takeChallenge(challenge) {
+    setLatestReward(null);
+    sessionRef.current = {
+      challengeId: challenge.challenge_id,
+      correctCount: Number(challenge.completed_count ?? 0),
+    };
+    await startChallenge(challenge);
   }
 
   function resetMissionPanel() {
@@ -483,7 +554,7 @@ export default function ChallengesPage() {
         </div>
       </section>
 
-      <PointsUpdateSection data={dashboardData} activeMission={activeMission} error={pointsError} />
+      <PointsUpdateSection data={dashboardData} activeMission={activeMission} latestReward={latestReward} error={pointsError} />
 
       <MissionStatusPanel mission={activeMission} error={missionError} onReset={resetMissionPanel} />
 
