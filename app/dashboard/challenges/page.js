@@ -61,6 +61,74 @@ function targetTone(label) {
   }
 }
 
+function PointsUpdateSection({ data, activeMission, error }) {
+  const totalPoints = Number(data?.profile?.eco_points ?? 0);
+  const latest = data?.latest;
+  const isCorrect = activeMission?.status === 'correct';
+  const expectedLabel = activeMission?.result?.expected_label ?? activeMission?.expected_label ?? 'target';
+  const detectedLabel = activeMission?.result?.detected_label ?? latest?.label ?? null;
+  const pointsAwarded = Number(activeMission?.points_awarded ?? 0);
+
+  return (
+    <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm">
+      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[1.5px] text-emerald-700">EcoPoints</p>
+          <div className="mt-2 flex items-end gap-3">
+            <p className="text-4xl font-black tracking-tight text-slate-950">{totalPoints.toLocaleString()}</p>
+            <span className="mb-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">
+              live balance
+            </span>
+          </div>
+          <p className="mt-2 text-sm text-slate-500">
+            Points update after AI confirms the detected item matches the selected challenge target.
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-slate-950">Latest points update</p>
+              <p className="mt-1 text-sm text-slate-500">
+                {isCorrect
+                  ? `${detectedLabel ?? 'Item'} matched ${expectedLabel}.`
+                  : latest
+                    ? `${latest.label} detected at ${latest.confidence_pct}% confidence.`
+                    : 'Waiting for the next verified SmartBin result.'}
+              </p>
+            </div>
+            <Badge
+              variant="outline"
+              className={isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}
+            >
+              {isCorrect ? `+${pointsAwarded} pts added` : 'No new points yet'}
+            </Badge>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-white p-3">
+              <p className="text-xs font-bold uppercase tracking-[1.2px] text-slate-400">Expected</p>
+              <p className="mt-1 font-black capitalize text-slate-950">{expectedLabel}</p>
+            </div>
+            <div className="rounded-lg bg-white p-3">
+              <p className="text-xs font-bold uppercase tracking-[1.2px] text-slate-400">Detected</p>
+              <p className="mt-1 font-black capitalize text-slate-950">{detectedLabel ?? '-'}</p>
+            </div>
+            <div className="rounded-lg bg-white p-3">
+              <p className="text-xs font-bold uppercase tracking-[1.2px] text-slate-400">Result</p>
+              <p className={`mt-1 font-black ${isCorrect ? 'text-emerald-700' : 'text-slate-500'}`}>
+                {isCorrect ? 'Correct' : 'Waiting'}
+              </p>
+            </div>
+          </div>
+
+          {error && <p className="mt-3 text-sm font-semibold text-rose-600">{error}</p>}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function ChallengeCard({ challenge, onTake, activeMission }) {
   const completed = challenge.status === 'completed';
   const expectedLabel = getExpectedLabel(challenge);
@@ -249,6 +317,41 @@ export default function ChallengesPage() {
   const [activeMission, setActiveMission] = useState(null);
   const [missionError, setMissionError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [dashboardData, setDashboardData] = useState(null);
+  const [pointsError, setPointsError] = useState('');
+
+  async function loadDashboardData() {
+    try {
+      const response = await fetch('/api/iot/dashboard', { cache: 'no-store' });
+      const result = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Could not load EcoPoints.');
+      }
+
+      setDashboardData(result);
+      setPointsError('');
+    } catch (error) {
+      setPointsError(error.message);
+    }
+  }
+
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      if (!alive) return;
+      await loadDashboardData();
+    }
+
+    load();
+    const interval = setInterval(load, 5000);
+
+    return () => {
+      alive = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   useEffect(() => {
     if (!activeMission?.mission_id || activeMission.status !== 'waiting') {
@@ -268,6 +371,7 @@ export default function ChallengesPage() {
 
         if (result.mission.status === 'correct') {
           fillChallenge(result.mission.challenge_id);
+          loadDashboardData();
         }
       } catch {
         if (alive) {
@@ -378,6 +482,8 @@ export default function ChallengesPage() {
           </div>
         </div>
       </section>
+
+      <PointsUpdateSection data={dashboardData} activeMission={activeMission} error={pointsError} />
 
       <MissionStatusPanel mission={activeMission} error={missionError} onReset={resetMissionPanel} />
 
