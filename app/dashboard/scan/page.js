@@ -20,9 +20,9 @@ import {
 } from 'lucide-react';
 
 const nearbyBins = [
-  { name: 'CST Block A', distance: '50m', fill: '62%', status: 'Available', color: 'bg-emerald-100 text-emerald-700' },
-  { name: 'CST Canteen', distance: '120m', fill: '48%', status: 'Available', color: 'bg-sky-100 text-sky-700' },
-  { name: 'CST Library', distance: '200m', fill: '80%', status: 'Almost Full', color: 'bg-yellow-100 text-yellow-700' },
+  { name: 'CST Block A', distance: '50m', fill: '62%', status: 'Available', color: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+  { name: 'CST Canteen', distance: '120m', fill: '48%', status: 'Available', color: 'border-emerald-100 bg-emerald-50 text-emerald-700' },
+  { name: 'CST Library', distance: '200m', fill: '80%', status: 'Almost Full', color: 'border-amber-100 bg-amber-50 text-amber-700' },
 ];
 
 export default function ScanPage() {
@@ -99,46 +99,46 @@ export default function ScanPage() {
       label: 'Latest detection',
       value: prediction?.label ? prediction.label[0].toUpperCase() + prediction.label.slice(1) : 'Upload photo',
       icon: Recycle,
-      bg: 'bg-sky-100',
-      color: 'text-sky-700',
+      bg: 'bg-slate-50',
+      color: 'text-slate-700',
     },
     {
       label: 'Confidence',
       value: confidence != null ? `${confidence}%` : '--',
       icon: ScanLine,
-      bg: 'bg-emerald-100',
+      bg: 'bg-emerald-50',
       color: 'text-emerald-700',
     },
-    { label: 'Bin fill level', value: '62%', icon: Wifi, bg: 'bg-yellow-100', color: 'text-yellow-700' },
+    { label: 'Bin fill level', value: '62%', icon: Wifi, bg: 'bg-slate-50', color: 'text-slate-700' },
     { label: 'Status', value: statusLabel, icon: CheckCircle2, bg: statusBg, color: statusText },
   ];
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       <section className="grid gap-5 xl:grid-cols-[1fr_0.72fr]">
-        <div className="overflow-hidden rounded-lg border border-white/80 bg-white/88 p-6 shadow-xl shadow-emerald-900/6">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/70">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <p className="text-sm font-black uppercase tracking-[1.8px] text-emerald-700">Smart Bin Quest</p>
+              <p className="text-sm font-bold uppercase tracking-[1.4px] text-emerald-700">Smart Bin Quest</p>
               <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">AI Smart Bin Activity</h1>
               <p className="mt-2 text-slate-500">Scan, sort, earn points, and keep your campus clean.</p>
             </div>
-            <span className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-black text-emerald-700">Bin is ready.</span>
+            <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">Bin is ready.</span>
           </div>
 
           <div className="grid gap-5 lg:grid-cols-[1fr_270px]">
-            <div className="relative overflow-hidden rounded-lg border-2 border-dashed border-sky-200 bg-[linear-gradient(135deg,#e0f7ff,#ecfdf5,#fff7cc)] p-5">
-              <div className="absolute right-5 top-5 rounded-full bg-white/80 px-3 py-1 text-xs font-black text-emerald-700 shadow-sm">+5 EcoPoints</div>
+            <div className="relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 p-5">
+              <div className="absolute right-5 top-5 rounded-full border border-emerald-100 bg-white px-3 py-1 text-xs font-bold text-emerald-700 shadow-sm">+5 EcoPoints</div>
               <div className="relative mx-auto grid h-80 max-w-md place-items-center">
-                <div className="absolute h-64 w-64 rounded-full border border-emerald-300/50" />
-                <div className="absolute h-48 w-48 rounded-full border border-sky-300/50" />
+                <div className="absolute h-64 w-64 rounded-full border border-emerald-200" />
+                <div className="absolute h-48 w-48 rounded-full border border-slate-200" />
                 <motion.div
-                  className="absolute h-56 w-56 rounded-full border border-yellow-300/50"
+                  className="absolute h-56 w-56 rounded-full border border-emerald-100"
                   animate={{ rotate: 360 }}
                   transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
                 />
 
-                <div className="relative w-36 rounded-b-lg border-4 border-emerald-900/10 bg-emerald-700 shadow-2xl shadow-emerald-900/20">
+                <div className="relative w-36 rounded-b-lg border border-emerald-900/10 bg-emerald-700 shadow-xl shadow-emerald-900/15">
                   <motion.div
                     className="h-8 rounded-t-lg bg-emerald-400"
                     animate={{ rotate: scanState === 'success' ? [0, -14, 0] : 0 }}
@@ -155,7 +155,7 @@ export default function ScanPage() {
                       <QrCode className="h-10 w-10 text-white" />
                     </div>
                     <motion.div
-                      className="absolute left-0 right-0 h-1 bg-sky-300"
+                      className="absolute left-0 right-0 h-1 bg-emerald-300"
                       animate={{ top: ['18%', '84%', '18%'] }}
                       transition={{ duration: 2.3, repeat: Infinity, ease: 'linear' }}
                     />
@@ -167,13 +167,13 @@ export default function ScanPage() {
 
             <div className="space-y-3">
               {activityStats.map((stat) => (
-                <div key={stat.label} className="rounded-lg border border-slate-100 bg-white p-4 shadow-sm shadow-emerald-900/5">
+                <div key={stat.label} className="rounded-lg border border-slate-200 bg-white p-4">
                   <div className="flex items-center gap-3">
                     <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${stat.bg}`}>
                       <stat.icon className={`h-5 w-5 ${stat.color}`} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold uppercase tracking-[1.4px] text-slate-400">{stat.label}</p>
+                      <p className="text-xs font-bold uppercase tracking-[1.2px] text-slate-400">{stat.label}</p>
                       <p className="text-xl font-black text-slate-950">{stat.value}</p>
                     </div>
                   </div>
@@ -183,19 +183,19 @@ export default function ScanPage() {
           </div>
         </div>
 
-        <div className="rounded-lg border border-white/80 bg-white/88 p-5 shadow-xl shadow-emerald-900/6">
-          <p className="text-sm font-black uppercase tracking-[1.8px] text-yellow-700">Scan Challenge</p>
+        <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/70">
+          <p className="text-sm font-bold uppercase tracking-[1.4px] text-emerald-700">Scan Challenge</p>
           <h2 className="mt-1 text-2xl font-black text-slate-950">Sort one item now</h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">Use the Smart Bin scanner to log your next eco-action and help Team Green climb.</p>
 
-          <div className="mt-5 rounded-lg bg-emerald-50 p-4 text-center">
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 p-4 text-center">
             {scanState === 'idle' && (
               <>
                 <Camera className="mx-auto h-12 w-12 text-emerald-600" />
                 <p className="mt-3 font-black text-emerald-950">Ready for model scan</p>
                 <p className="mt-1 text-sm text-emerald-700">Upload one item photo to classify it with waste_model2.h5.</p>
                 {!selectedFile ? (
-                  <label className="mx-auto mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-lg border-2 border-dashed border-emerald-200 bg-white px-4 py-3 text-sm font-black text-emerald-700">
+                  <label className="mx-auto mt-4 flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-emerald-200 bg-white px-4 py-3 text-sm font-bold text-emerald-700">
                     <ImageUp className="h-4 w-4" />
                     Upload item photo
                     <input
@@ -210,7 +210,7 @@ export default function ScanPage() {
                     />
                   </label>
                 ) : (
-                  <div className="mt-4 rounded-lg border border-emerald-100 bg-white p-3 text-left">
+                  <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 text-left">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <p className="text-sm font-black text-emerald-950">{selectedFile.name}</p>
@@ -229,13 +229,13 @@ export default function ScanPage() {
                     </div>
                   </div>
                 )}
-                <button onClick={handleScan} className="mt-4 rounded-lg bg-emerald-600 px-5 py-3 font-black text-white shadow-lg shadow-emerald-900/15">
+                <button onClick={handleScan} className="mt-4 rounded-lg border border-emerald-200 bg-white px-5 py-3 font-bold text-emerald-700 transition hover:bg-emerald-50">
                   Simulate QR Deposit
                 </button>
                 <button
                   onClick={runModelScan}
                   disabled={!selectedFile || isAnalyzing}
-                  className="ml-2 mt-4 rounded-lg bg-sky-500 px-5 py-3 font-black text-white shadow-lg shadow-sky-900/15 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="ml-2 mt-4 rounded-lg bg-emerald-600 px-5 py-3 font-bold text-white shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="inline-flex items-center gap-2">
                     <Upload className={`h-4 w-4 ${isAnalyzing ? 'animate-bounce' : ''}`} />
@@ -258,10 +258,10 @@ export default function ScanPage() {
             )}
             {scanState === 'scanning' && (
               <>
-                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }} className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-sky-100">
-                  <ScanLine className="h-7 w-7 text-sky-600" />
+                <motion.div animate={{ rotate: 360 }} transition={{ duration: 1.4, repeat: Infinity, ease: 'linear' }} className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-emerald-50">
+                  <ScanLine className="h-7 w-7 text-emerald-600" />
                 </motion.div>
-                <p className="mt-3 font-black text-sky-800">Scanning QR code...</p>
+                <p className="mt-3 font-black text-emerald-800">Scanning QR code...</p>
               </>
             )}
             {scanState === 'success' && (
@@ -281,7 +281,7 @@ export default function ScanPage() {
                     setVerification(null);
                     setVerifyError('');
                   }}
-                  className="mt-4 rounded-lg bg-yellow-400 px-5 py-3 font-black text-emerald-950"
+                  className="mt-4 rounded-lg bg-emerald-600 px-5 py-3 font-bold text-white"
                 >
                   Scan Another
                 </button>
@@ -289,27 +289,27 @@ export default function ScanPage() {
             )}
           </div>
 
-          <div className="mt-5 rounded-lg bg-sky-50 p-4">
-            <div className="flex items-center gap-2 text-sm font-black text-sky-800">
+          <div className="mt-5 rounded-lg border border-emerald-100 bg-emerald-50 p-4">
+            <div className="flex items-center gap-2 text-sm font-bold text-emerald-800">
               <Trophy className="h-4 w-4" />
               Almost there!
             </div>
-            <p className="mt-1 text-sm text-sky-700">One correct scan moves Team Green closer to Rank #1.</p>
+            <p className="mt-1 text-sm text-emerald-700">One correct scan moves Team Green closer to Rank #1.</p>
           </div>
         </div>
       </section>
 
-      <section className="rounded-lg border border-white/80 bg-white/88 p-5 shadow-xl shadow-emerald-900/6">
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/70">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <p className="text-sm font-black uppercase tracking-[1.8px] text-emerald-700">Nearby Smart Bins</p>
+            <p className="text-sm font-bold uppercase tracking-[1.4px] text-emerald-700">Nearby Smart Bins</p>
             <h2 className="mt-1 text-xl font-black text-slate-950">Choose your next station</h2>
           </div>
-          <Sparkles className="h-7 w-7 text-yellow-500" />
+          <Sparkles className="h-7 w-7 text-slate-400" />
         </div>
         <div className="grid gap-3 lg:grid-cols-3">
           {nearbyBins.map((bin) => (
-            <div key={bin.name} className="rounded-lg border border-slate-100 bg-slate-50 p-4">
+            <div key={bin.name} className="rounded-lg border border-slate-200 bg-white p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
@@ -323,7 +323,7 @@ export default function ScanPage() {
                     </p>
                   </div>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs font-black ${bin.color}`}>{bin.status}</span>
+                <span className={`rounded-full border px-3 py-1 text-xs font-bold ${bin.color}`}>{bin.status}</span>
               </div>
               <div className="mt-4">
                 <div className="mb-1 flex items-center justify-between text-xs font-bold text-slate-500">
@@ -331,7 +331,7 @@ export default function ScanPage() {
                   <span>{bin.fill}</span>
                 </div>
                 <div className="h-2.5 overflow-hidden rounded-full bg-white">
-                  <div className="h-full rounded-full bg-emerald-400" style={{ width: bin.fill }} />
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: bin.fill }} />
                 </div>
               </div>
             </div>

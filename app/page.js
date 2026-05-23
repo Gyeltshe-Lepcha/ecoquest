@@ -237,22 +237,20 @@ function Header() {
     <header
       className={`fixed inset-x-0 top-0 z-50 transition-all duration-300 ${
         scrolled
-          ? 'border-b border-emerald-200/80 bg-white/88 shadow-sm shadow-emerald-900/5 backdrop-blur-xl'
-          : 'bg-white/45 backdrop-blur-md'
+          ? 'bg-[linear-gradient(90deg,rgba(255,255,255,0.94)_0%,rgba(255,255,255,0.9)_38%,rgba(236,253,245,0.82)_100%)] backdrop-blur-xl'
+          : 'bg-[linear-gradient(90deg,rgba(255,255,255,0.78)_0%,rgba(255,255,255,0.72)_38%,rgba(236,253,245,0.62)_100%)] backdrop-blur-md'
       }`}
     >
       <div className="mx-auto max-w-7xl px-6">
-        <div className="flex h-16 items-center justify-between">
+        <div className="flex h-20 items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
-            <div
-              className="flex h-9 w-9 items-center justify-center bg-emerald-600 text-white shadow-lg shadow-emerald-900/15"
-              style={{ clipPath: 'polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))' }}
-            >
-              <Leaf className="h-4 w-4" />
-            </div>
-            <span className="font-semibold tracking-[1.5px] text-emerald-950">EcoQuest Bhutan</span>
+            <img
+              src="IMG_2014.png"
+              alt="EcoQuest Bhutan"
+              className="h-16 w-16 object-cover mix-blend-multiply"
+            />
           </Link>
-
+       
           <nav className="hidden items-center gap-8 md:flex">
             {navItems.map((item) => (
               <Link
@@ -271,12 +269,12 @@ function Header() {
                 Log in
               </button>
             </Link>
-            <Link href="/dashboard">
+            <Link href="/register">
               <button
                 className="bg-emerald-600 px-5 py-2 text-sm font-bold text-white shadow-lg shadow-emerald-900/15 transition-all hover:bg-emerald-700"
                 style={{ clipPath: 'polygon(0 0,calc(100% - 8px) 0,100% 8px,100% 100%,8px 100%,0 calc(100% - 8px))' }}
               >
-                Launch Demo
+                Signup
               </button>
             </Link>
           </div>
@@ -311,9 +309,9 @@ function Header() {
                       Log in
                     </button>
                   </Link>
-                  <Link href="/dashboard">
+                  <Link href="/register">
                     <button className="w-full rounded-md bg-emerald-600 py-2 text-sm font-bold text-white">
-                      Demo
+                      Signup
                     </button>
                   </Link>
                 </div>
@@ -403,28 +401,6 @@ export default function HomePage() {
               digital rewards, and leaderboard glory, built for Bhutan.
             </p>
 
-            <div className="flex flex-wrap gap-3">
-              <Link href="/dashboard">
-                <motion.button
-                  className="flex items-center gap-2 bg-emerald-600 px-8 py-3.5 text-sm font-bold uppercase tracking-[2px] text-white shadow-xl shadow-emerald-900/15"
-                  style={{ clipPath: 'polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))' }}
-                  whileHover={{ scale: 1.02, backgroundColor: '#047857' }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Launch User Demo <ChevronRight className="h-4 w-4" />
-                </motion.button>
-              </Link>
-              <Link href="/admin">
-                <motion.button
-                  className="flex items-center gap-2 border border-emerald-300 bg-white/65 px-8 py-3.5 text-sm font-bold uppercase tracking-[2px] text-emerald-800 shadow-lg shadow-emerald-900/5 backdrop-blur"
-                  style={{ clipPath: 'polygon(0 0,calc(100% - 12px) 0,100% 12px,100% 100%,12px 100%,0 calc(100% - 12px))' }}
-                  whileHover={{ borderColor: '#059669', backgroundColor: 'rgba(236,253,245,0.95)' }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Admin Command
-                </motion.button>
-              </Link>
-            </div>
           </motion.div>
         </div>
       </section>

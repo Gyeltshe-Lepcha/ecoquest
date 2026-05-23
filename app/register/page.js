@@ -143,7 +143,7 @@ export default function RegisterPage() {
                       <Label htmlFor="name">Full Name</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
-                        <Input id="name" type="text" placeholder="Tshering Dorji" className="pl-10" value={formData.name} onChange={(e) => updateField('name', e.target.value)} required/>
+                        <Input id="name" type="text" placeholder="Username" className="pl-10" value={formData.name} onChange={(e) => updateField('name', e.target.value)} required/>
                       </div>
                     </div>
 
@@ -151,7 +151,7 @@ export default function RegisterPage() {
                       <Label htmlFor="email">Email</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground"/>
-                        <Input id="email" type="email" placeholder="you@example.com" className="pl-10" value={formData.email} onChange={(e) => updateField('email', e.target.value)} required/>
+                        <Input id="email" type="email" placeholder="name@example.com" className="pl-10" value={formData.email} onChange={(e) => updateField('email', e.target.value)} required/>
                       </div>
                     </div>
 

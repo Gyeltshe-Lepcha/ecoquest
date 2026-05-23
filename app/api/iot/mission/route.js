@@ -52,7 +52,7 @@ export async function POST(request) {
     mission: updatedMission,
     devkit,
     message: devkit.status === 'commanded'
-      ? `Mission generated and ESP32 DevKit armed for one ${expectedLabel} item.`
+      ? `Mission generated for one ${expectedLabel} item. Waiting for the SmartBin ultrasonic and IR sensors.`
       : `Mission generated. Sort one ${expectedLabel} item through the SmartBin.`,
   });
 }

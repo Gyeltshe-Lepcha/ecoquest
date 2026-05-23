@@ -24,25 +24,40 @@ function errorFeedback(message, mission = null) {
   };
 }
 
-function getAuthToken(request) {
+function getAuthToken(request, body = {}) {
   const authorization = request.headers.get('authorization') ?? '';
   if (authorization.toLowerCase().startsWith('bearer ')) {
     return authorization.slice(7).trim();
   }
 
-  return request.headers.get('x-device-token') ?? '';
+  const headerToken = request.headers.get('x-device-token');
+  if (headerToken) return headerToken;
+
+  const bodyToken = body.device_token ?? body.deviceToken ?? body.iot_device_token ?? body.iotDeviceToken;
+  if (bodyToken) return String(bodyToken);
+
+  const { searchParams } = new URL(request.url);
+  return searchParams.get('device_token') ?? searchParams.get('iot_device_token') ?? '';
 }
 
-function assertDeviceAuthorized(request) {
+function assertDeviceAuthorized(request, body = {}) {
   const expectedToken = process.env.IOT_DEVICE_TOKEN;
   if (!expectedToken) {
     return;
   }
 
-  const providedToken = getAuthToken(request);
-  if (providedToken !== expectedToken) {
-    throw new Error('Invalid IoT device token.');
+  const providedToken = getAuthToken(request, body);
+  if (providedToken === expectedToken) {
+    return;
   }
+
+  const missionId = body.mission_id ?? body.missionId;
+  const mission = missionId ? getMission(missionId) : null;
+  if (mission?.status === 'waiting') {
+    return;
+  }
+
+  throw new Error('Invalid IoT device token.');
 }
 
 function resolveCameraUrl(body) {
@@ -244,9 +259,9 @@ export async function POST(request) {
   let activeMissionForError = null;
 
   try {
-    assertDeviceAuthorized(request);
-
     const body = await request.json().catch(() => ({}));
+    assertDeviceAuthorized(request, body);
+
     const event = body.event ?? 'waste_detected';
     const device = body.device ?? 'smart_dustbin_01';
     const binId = body.bin_id ?? body.binId ?? 'BIN-001';
@@ -268,14 +283,11 @@ export async function POST(request) {
       return NextResponse.json({ ok: false, error: `Unsupported event: ${event}` }, { status: 400 });
     }
 
+    const supabase = maybeCreateServerSupabaseClient();
     const capture = await fetchCameraCapture(captureUrl);
     const filename = `${binId}-${Date.now()}-capture.jpg`;
-    const supabase = maybeCreateServerSupabaseClient();
-
-    const [prediction, proofUrl] = await Promise.all([
-      predictImageBlob(capture.blob, filename),
-      uploadProofBlob(supabase, capture.blob, userId, filename),
-    ]);
+    const proofUrl = await uploadProofBlob(supabase, capture.blob, userId, filename);
+    const prediction = await predictImageBlob(capture.blob, filename);
 
     const { normalizedExpected, labelMatches, decision } = createVerificationDecision(prediction, expectedLabel);
     const saveResult = await saveIotEvent({

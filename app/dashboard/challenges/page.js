@@ -3,16 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
-  AlertCircle,
   CheckCircle2,
   Clock,
-  Filter,
-  Leaf,
   QrCode,
   Search,
   Sparkles,
   Target,
-  Trophy,
   Wifi,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -20,7 +16,6 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { challenges as challengeSeed } from '@/lib/ecoquest-data';
 
 const emptyProgress = {
@@ -139,94 +134,6 @@ function ChallengeCard({ challenge, onTake, activeMission }) {
   );
 }
 
-function LiveSmartBinQuest({ iotData, items }) {
-  const latest = iotData?.latest;
-  const connected = Boolean(iotData?.connected);
-  const latestLabel = latest?.label ? latest.label[0].toUpperCase() + latest.label.slice(1) : 'Waiting';
-  const completed = items.filter((item) => item.status === 'completed').length;
-  const progressPct = Math.round((completed / items.length) * 100);
-
-  const workflowSteps = [
-    {
-      title: 'Mission armed',
-      body: 'Take Challenge sends the target label to the ESP32 DevKit.',
-      done: connected,
-      icon: Target,
-    },
-    {
-      title: 'Physical detection',
-      body: 'Ultrasonic opens the lid; IR waits for object entry.',
-      done: Boolean(latest),
-      icon: QrCode,
-    },
-    {
-      title: 'ESP32-CAM proof',
-      body: latest ? `${latestLabel} captured from the camera path.` : 'Backend waits for /capture JPEG.',
-      done: Boolean(latest),
-      icon: Wifi,
-    },
-    {
-      title: 'AI decision',
-      body: latest ? `${latestLabel} classified at ${latest.confidence_pct}% confidence.` : 'Model result will complete or reject the mission.',
-      done: Boolean(latest),
-      icon: CheckCircle2,
-    },
-  ];
-
-  return (
-    <Card className="border-emerald-100 bg-emerald-50/60">
-      <CardContent className="p-5">
-        <div className="mb-5 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-[1.5px] text-emerald-700">
-              <Sparkles className="h-3.5 w-3.5" />
-              Live SmartBin Mission Board
-            </div>
-            <h2 className="text-xl font-bold text-emerald-950">Five empty quests, filled by real hardware</h2>
-            <p className="mt-1 text-sm text-emerald-700">
-              Each card starts at 0/1 and updates only after ESP32-CAM proof is classified by the AI model.
-            </p>
-          </div>
-          <div className="rounded-xl bg-white px-4 py-3 text-right shadow-sm">
-            <p className="text-xs font-bold uppercase tracking-[1.3px] text-emerald-600">Latest detection</p>
-            <p className="text-2xl font-black text-emerald-950">{latestLabel}</p>
-            <p className="text-xs font-semibold text-slate-500">{latest ? 'Synced from SmartBin' : 'No mission proof yet'}</p>
-          </div>
-        </div>
-
-        <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
-          <div className="rounded-xl bg-white p-4 shadow-sm">
-            <div className="mb-2 flex items-center justify-between">
-              <span className="text-sm font-semibold text-slate-600">Mission board progress</span>
-              <span className="text-sm font-black text-emerald-700">{completed} / {items.length}</span>
-            </div>
-            <Progress value={progressPct} className="h-3" />
-            <p className="mt-3 text-sm font-semibold text-slate-500">
-              {completed === 0 ? 'Empty for now. Start with plastic, then paper, bottle, and unknown.' : 'Completed missions are filled by live IoT verification.'}
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            {workflowSteps.map((step) => (
-              <div key={step.title} className={`rounded-xl border bg-white p-3 ${step.done ? 'border-emerald-200' : 'border-slate-100'}`}>
-                <div className="flex items-start gap-3">
-                  <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${step.done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
-                    <step.icon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold text-slate-900">{step.title}</p>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">{step.body}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
 function MissionStatusPanel({ mission, error, onReset }) {
   if (!mission && !error) return null;
 
@@ -339,38 +246,9 @@ export default function ChallengesPage() {
     ...challenge,
     ...emptyProgress,
   })));
-  const [iotData, setIotData] = useState(null);
   const [activeMission, setActiveMission] = useState(null);
   const [missionError, setMissionError] = useState('');
-  const [localPoints, setLocalPoints] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-
-  useEffect(() => {
-    let alive = true;
-
-    async function loadIotData() {
-      try {
-        const response = await fetch('/api/iot/dashboard', { cache: 'no-store' });
-        const result = await response.json();
-
-        if (alive && response.ok) {
-          setIotData(result);
-        }
-      } catch {
-        if (alive) {
-          setIotData(null);
-        }
-      }
-    }
-
-    loadIotData();
-    const interval = setInterval(loadIotData, 8000);
-
-    return () => {
-      alive = false;
-      clearInterval(interval);
-    };
-  }, []);
 
   useEffect(() => {
     if (!activeMission?.mission_id || activeMission.status !== 'waiting') {
@@ -389,7 +267,6 @@ export default function ChallengesPage() {
         setActiveMission(result.mission);
 
         if (result.mission.status === 'correct') {
-          setLocalPoints((current) => current + Number(result.mission.points_awarded ?? 5));
           fillChallenge(result.mission.challenge_id);
         }
       } catch {
@@ -481,12 +358,15 @@ export default function ChallengesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Challenges</h1>
-          <p className="text-muted-foreground">Five SmartBin missions. Empty until the physical IoT flow verifies them.</p>
-        </div>
-        <div className="flex items-center gap-3">
+      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="max-w-2xl">
+            <p className="text-sm font-bold uppercase tracking-[1.4px] text-emerald-700">Challenges</p>
+            <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">SmartBin Missions</h1>
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              Choose one target item, complete it on the physical SmartBin, and wait for AI verification.
+            </p>
+          </div>
           <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
@@ -496,77 +376,47 @@ export default function ChallengesPage() {
               className="w-full pl-9 sm:w-64"
             />
           </div>
-          <Button variant="outline" size="icon">
-            <Filter className="h-4 w-4" />
-          </Button>
         </div>
-      </div>
+      </section>
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-        {[
-          { label: 'Active', value: activeChallenges.length, icon: Target, color: 'text-primary' },
-          { label: 'Filled', value: completedChallenges.length, icon: CheckCircle2, color: 'text-chart-5' },
-          { label: 'Points available', value: availablePoints, icon: Sparkles, color: 'text-accent' },
-          { label: 'Mission earned', value: `+${localPoints}`, icon: Trophy, color: 'text-chart-5' },
-          { label: 'Targets', value: 4, icon: Leaf, color: 'text-chart-4' },
-        ].map((stat) => (
-          <Card key={stat.label} className="border-border/50">
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted">
-                <stat.icon className={`h-5 w-5 ${stat.color}`} />
-              </div>
-              <div>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-xs text-muted-foreground">{stat.label}</p>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <LiveSmartBinQuest iotData={iotData} items={items} />
       <MissionStatusPanel mission={activeMission} error={missionError} onReset={resetMissionPanel} />
 
-      <Tabs defaultValue="active" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="active" className="gap-2">
-            <Target className="h-4 w-4" />
-            Empty ({activeChallenges.length})
-          </TabsTrigger>
-          <TabsTrigger value="completed" className="gap-2">
-            <CheckCircle2 className="h-4 w-4" />
-            Filled ({completedChallenges.length})
-          </TabsTrigger>
-        </TabsList>
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">Available missions</h2>
+            <p className="text-sm text-slate-500">{activeChallenges.length} missions waiting for hardware verification</p>
+          </div>
+          <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">
+            +{availablePoints} pts available
+          </span>
+        </div>
 
-        <TabsContent value="active" className="space-y-4">
-          {activeChallenges.map((challenge) => (
-            <ChallengeCard key={challenge.challenge_id} challenge={challenge} onTake={takeChallenge} activeMission={activeMission} />
-          ))}
-          {activeChallenges.length === 0 && (
-            <Card className="border-emerald-100 bg-emerald-50">
-              <CardContent className="flex items-center gap-3 p-5 text-emerald-800">
-                <CheckCircle2 className="h-5 w-5" />
-                Every SmartBin mission is filled.
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
+        {activeChallenges.map((challenge) => (
+          <ChallengeCard key={challenge.challenge_id} challenge={challenge} onTake={takeChallenge} activeMission={activeMission} />
+        ))}
 
-        <TabsContent value="completed" className="space-y-4">
+        {activeChallenges.length === 0 && (
+          <Card className="border-emerald-100 bg-emerald-50">
+            <CardContent className="flex items-center gap-3 p-5 text-emerald-800">
+              <CheckCircle2 className="h-5 w-5" />
+              Every SmartBin mission is filled.
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      {completedChallenges.length > 0 && (
+        <section className="space-y-4">
+          <div>
+            <h2 className="text-lg font-bold text-slate-950">Completed missions</h2>
+            <p className="text-sm text-slate-500">Verified missions from this session</p>
+          </div>
           {completedChallenges.map((challenge) => (
             <ChallengeCard key={challenge.challenge_id} challenge={challenge} onTake={takeChallenge} activeMission={activeMission} />
           ))}
-          {completedChallenges.length === 0 && (
-            <Card className="border-dashed">
-              <CardContent className="flex items-center gap-3 p-5 text-muted-foreground">
-                <AlertCircle className="h-5 w-5" />
-                No missions filled yet. Start with plastic.
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+        </section>
+      )}
     </div>
   );
 }
