@@ -29,8 +29,8 @@ import {
 const navItems = [
   { href: '#experience', label: 'Experience' },
   { href: '#modules', label: 'Modules' },
-  { href: '#flow', label: 'Demo Flow' },
-  { href: '#requirements', label: 'SRS' },
+  { href: '#flow', label: 'Gamification' },
+  { href: '#requirements', label: 'Sustainable' },
 ];
 
 const ticker = [
@@ -386,7 +386,7 @@ export default function HomePage() {
                 transition={{ duration: 1.8, repeat: Infinity }}
               />
               <span className="text-xs font-bold uppercase tracking-[2px] text-emerald-700">
-                SmartBin+ Bhutan Hackathon 2025
+                EcoTech Bhutan 2026
               </span>
             </motion.div>
 
