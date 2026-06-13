@@ -1,20 +1,25 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import {
+  Camera,
   CheckCircle2,
-  Clock,
-  QrCode,
-  Search,
+  CircleGauge,
+  Coins,
+  Cpu,
+  Flag,
+  LockKeyhole,
+  Play,
+  Radio,
   Sparkles,
   Target,
+  Trophy,
   Wifi,
+  Zap,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { challenges as challengeSeed } from '@/lib/ecoquest-data';
 
@@ -25,6 +30,53 @@ const emptyProgress = {
   completed_count: 0,
   goal_count: ITEMS_PER_CHALLENGE,
   status: 'active',
+};
+
+const nodePositions = [
+  { left: '14%', top: '78%' },
+  { left: '30%', top: '67%' },
+  { left: '48%', top: '58%' },
+  { left: '66%', top: '43%' },
+  { left: '78%', top: '25%' },
+];
+
+const targetThemes = {
+  plastic: {
+    bg: 'bg-sky-100',
+    text: 'text-sky-800',
+    border: 'border-sky-200',
+    glow: 'shadow-sky-300/40',
+    ring: 'ring-sky-200',
+    accent: 'from-sky-400 to-cyan-300',
+    section: 'Section 1',
+  },
+  paper: {
+    bg: 'bg-amber-100',
+    text: 'text-amber-800',
+    border: 'border-amber-200',
+    glow: 'shadow-amber-300/40',
+    ring: 'ring-amber-200',
+    accent: 'from-amber-300 to-yellow-200',
+    section: 'Section 1',
+  },
+  bottle: {
+    bg: 'bg-emerald-100',
+    text: 'text-emerald-800',
+    border: 'border-emerald-200',
+    glow: 'shadow-emerald-300/40',
+    ring: 'ring-emerald-200',
+    accent: 'from-emerald-400 to-lime-300',
+    section: 'Section 1',
+  },
+  unknown: {
+    bg: 'bg-slate-100',
+    text: 'text-slate-700',
+    border: 'border-slate-200',
+    glow: 'shadow-slate-300/30',
+    ring: 'ring-slate-200',
+    accent: 'from-slate-400 to-slate-200',
+    section: 'Review',
+  },
 };
 
 function getExpectedLabel(challenge) {
@@ -38,284 +90,353 @@ function getExpectedLabel(challenge) {
   return '';
 }
 
-function getDeadlineLabel(deadline, completed) {
-  if (completed) return 'Completed';
-
-  const delta = new Date(deadline).getTime() - Date.now();
-  if (Number.isNaN(delta) || delta <= 0) return 'Ready now';
-
-  const hours = Math.ceil(delta / (1000 * 60 * 60));
-  return hours < 24 ? `${hours} hours left` : `${Math.ceil(hours / 24)} days left`;
+function getTheme(label) {
+  return targetThemes[label] ?? targetThemes.unknown;
 }
 
-function targetTone(label) {
-  switch (label) {
-    case 'plastic':
-      return 'bg-sky-50 text-sky-700 border-sky-100';
-    case 'paper':
-      return 'bg-amber-50 text-amber-700 border-amber-100';
-    case 'bottle':
-      return 'bg-emerald-50 text-emerald-700 border-emerald-100';
-    case 'unknown':
-      return 'bg-slate-100 text-slate-700 border-slate-200';
-    default:
-      return 'bg-muted text-muted-foreground';
-  }
+function missionStepState(mission) {
+  if (!mission) return 'idle';
+  if (mission.status === 'correct') return 'complete';
+  if (mission.status === 'try_again') return 'retry';
+  if (mission.status === 'waiting') return 'active';
+  return 'idle';
 }
 
-function PointsUpdateSection({ data, activeMission, latestReward, error }) {
-  const totalPoints = Number(data?.profile?.eco_points ?? 0);
-  const latest = data?.latest;
-  const isCorrect = Boolean(latestReward) || activeMission?.status === 'correct';
-  const expectedLabel =
-    latestReward?.expected_label ??
-    activeMission?.result?.expected_label ??
-    activeMission?.expected_label ??
-    'target';
-  const detectedLabel =
-    latestReward?.detected_label ??
-    activeMission?.result?.detected_label ??
-    latest?.label ??
-    null;
-  const pointsAwarded = Number(latestReward?.points_awarded ?? activeMission?.points_awarded ?? 0);
+function PointsHud({ totalPoints, latestReward }) {
+  return (
+    <motion.div
+      layout
+      className="absolute left-5 top-5 z-20 flex items-center gap-3 rounded-[1.4rem] border border-white/70 bg-white/80 px-4 py-3 shadow-xl shadow-emerald-900/10 backdrop-blur-xl"
+      animate={latestReward ? { scale: [1, 1.04, 1] } : { scale: 1 }}
+      transition={{ duration: 0.35 }}
+    >
+      <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-300 to-yellow-500 text-white shadow-lg shadow-amber-400/30">
+        <Coins className="h-6 w-6" />
+      </div>
+      <div>
+        <p className="text-[11px] font-black uppercase tracking-[1.6px] text-emerald-700">Total EcoPoints</p>
+        <div className="flex items-end gap-2">
+          <motion.p
+            key={totalPoints}
+            initial={{ y: 8, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="text-3xl font-black tracking-tight text-slate-950"
+          >
+            {totalPoints.toLocaleString()}
+          </motion.p>
+          <AnimatePresence>
+            {latestReward && (
+              <motion.span
+                key={latestReward.id}
+                initial={{ opacity: 0, y: 10, scale: 0.86 }}
+                animate={{ opacity: 1, y: -2, scale: 1 }}
+                exit={{ opacity: 0, y: -18, scale: 0.92 }}
+                className="mb-1 rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-black text-white shadow-lg shadow-emerald-400/40"
+              >
+                +{latestReward.points_awarded}
+              </motion.span>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function MapDecoration() {
+  const trees = [
+    ['8%', '19%'], ['18%', '39%'], ['8%', '59%'], ['30%', '28%'], ['36%', '82%'],
+    ['54%', '21%'], ['60%', '76%'], ['86%', '47%'], ['88%', '72%'], ['72%', '14%'],
+  ];
+  const clouds = [
+    ['19%', '9%', 'w-36'], ['55%', '8%', 'w-44'], ['82%', '11%', 'w-32'],
+  ];
 
   return (
-    <section className="rounded-lg border border-emerald-100 bg-white p-5 shadow-sm">
-      <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[1.5px] text-emerald-700">EcoPoints</p>
-          <div className="mt-2 flex items-end gap-3">
-            <p className="text-4xl font-black tracking-tight text-slate-950">{totalPoints.toLocaleString()}</p>
-            <span className="mb-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">
-              live balance
-            </span>
-          </div>
-          <p className="mt-2 text-sm text-slate-500">
-            Points update after AI confirms the detected item matches the selected challenge target.
-          </p>
-        </div>
+    <>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(255,255,255,0.95),transparent_18%),linear-gradient(180deg,#dff8ff_0%,#c8f3ca_33%,#74d86b_100%)]" />
+      <div className="absolute bottom-0 right-0 h-56 w-80 rounded-tl-[7rem] bg-gradient-to-br from-cyan-200 to-sky-400 opacity-90" />
+      <div className="absolute bottom-8 right-8 h-36 w-64 rounded-tl-[6rem] bg-gradient-to-br from-cyan-100 to-cyan-300 opacity-80" />
+      <div className="absolute left-0 top-[47%] h-44 w-60 rounded-r-full bg-lime-300/60 blur-sm" />
+      <div className="absolute bottom-0 left-0 h-28 w-full bg-gradient-to-t from-lime-300/80 to-transparent" />
 
-        <div className="rounded-xl border border-slate-100 bg-slate-50 p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
+      {clouds.map(([left, top, width], index) => (
+        <div key={`${left}-${top}`} className={`absolute ${width} h-14 rounded-full bg-white/80 blur-[1px]`} style={{ left, top }}>
+          <div className="absolute left-5 top-[-14px] h-14 w-20 rounded-full bg-white/90" />
+          <div className="absolute right-5 top-[-10px] h-12 w-16 rounded-full bg-white/90" />
+          {index === 1 && <div className="absolute right-[-60px] top-5 h-px w-12 bg-sky-300/50" />}
+        </div>
+      ))}
+
+      {trees.map(([left, top], index) => (
+        <div key={`${left}-${top}`} className="absolute h-16 w-16" style={{ left, top }}>
+          <div className="absolute bottom-0 left-7 h-8 w-3 rounded-full bg-amber-800" />
+          <div className={`absolute h-12 w-12 rounded-full ${index % 2 ? 'bg-emerald-600' : 'bg-green-500'} shadow-lg shadow-green-900/10`} />
+          <div className={`absolute left-6 top-2 h-10 w-10 rounded-full ${index % 2 ? 'bg-green-500' : 'bg-emerald-500'}`} />
+        </div>
+      ))}
+
+      <div className="absolute bottom-28 right-28 flex items-center gap-2 rounded-3xl border-4 border-amber-200 bg-white px-4 py-3 shadow-xl">
+        <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-400 to-lime-300 text-white">
+          <Trophy className="h-5 w-5" />
+        </div>
+        <div>
+          <p className="text-xs font-black uppercase tracking-[1.4px] text-amber-700">Rewards</p>
+          <p className="text-sm font-black text-slate-950">Shop</p>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function QuestNode({ challenge, index, state, activeMission }) {
+  const expectedLabel = getExpectedLabel(challenge);
+  const theme = getTheme(expectedLabel);
+  const position = nodePositions[index] ?? nodePositions[nodePositions.length - 1];
+  const completed = state === 'completed';
+  const current = state === 'current';
+  const locked = state === 'locked';
+  const Icon = completed ? CheckCircle2 : locked ? LockKeyhole : Target;
+
+  return (
+    <motion.div
+      layout
+      className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
+      style={{ left: position.left, top: position.top }}
+      initial={{ opacity: 0, y: 20, scale: 0.9 }}
+      animate={{ opacity: 1, y: 0, scale: current ? 1.06 : 1 }}
+      transition={{ delay: index * 0.08, type: 'spring', stiffness: 220, damping: 20 }}
+    >
+      {current && (
+        <motion.div
+          className="absolute -inset-4 rounded-full border-4 border-white/80 bg-emerald-300/30"
+          animate={{ scale: [1, 1.18, 1], opacity: [0.5, 0.18, 0.5] }}
+          transition={{ repeat: Infinity, duration: 1.8 }}
+        />
+      )}
+
+      <div
+        className={`relative flex h-24 w-24 items-center justify-center rounded-full border-[6px] ${
+          locked
+            ? 'border-slate-300 bg-slate-400 text-slate-100 shadow-lg shadow-slate-400/30'
+            : completed
+              ? 'border-emerald-100 bg-emerald-500 text-white shadow-xl shadow-emerald-400/40'
+              : `border-white bg-gradient-to-br ${theme.accent} text-white shadow-xl ${theme.glow}`
+        }`}
+      >
+        <div className="absolute inset-2 rounded-full border border-white/40" />
+        <Icon className="h-9 w-9 drop-shadow" />
+        {!locked && (
+          <span className="absolute -bottom-3 flex h-9 w-9 items-center justify-center rounded-full border-4 border-white bg-orange-500 text-base font-black text-white shadow-lg">
+            {index + 1}
+          </span>
+        )}
+      </div>
+
+      {current && (
+        <motion.div
+          className="absolute left-1/2 top-[-82px] w-36 -translate-x-1/2 rounded-2xl border-4 border-pink-300 bg-slate-800 px-3 py-2 text-center text-white shadow-xl"
+          initial={{ y: 8, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+        >
+          <p className="text-[10px] font-black uppercase tracking-[1.3px] text-pink-200">You are here</p>
+          <p className="text-sm font-black capitalize">{expectedLabel} quest</p>
+          <div className="absolute left-1/2 top-full h-4 w-4 -translate-x-1/2 -translate-y-2 rotate-45 border-b-4 border-r-4 border-pink-300 bg-slate-800" />
+        </motion.div>
+      )}
+
+      <div className="absolute left-1/2 top-[112px] w-36 -translate-x-1/2 text-center">
+        <p className={`text-xs font-black uppercase tracking-[1px] ${locked ? 'text-slate-500' : 'text-emerald-950'}`}>
+          {locked ? 'Locked' : completed ? 'Complete' : activeMission?.status === 'waiting' && activeMission.challenge_id === challenge.challenge_id ? 'Listening' : challenge.title.replace(' SmartBin mission', '')}
+        </p>
+        {!locked && (
+          <p className="mt-1 text-[11px] font-bold text-emerald-900/70">
+            {challenge.completed_count}/{challenge.goal_count} items
+          </p>
+        )}
+      </div>
+    </motion.div>
+  );
+}
+
+function QuestMap({ items, currentChallenge, activeMission, dashboardData, latestReward, onStart }) {
+  const totalPoints = Number(dashboardData?.profile?.eco_points ?? 320);
+  const currentIndex = Math.max(0, items.findIndex((challenge) => challenge.challenge_id === currentChallenge?.challenge_id));
+  const missionState = missionStepState(activeMission);
+  const currentTheme = getTheme(getExpectedLabel(currentChallenge));
+  const missionInFlight = activeMission?.status === 'waiting';
+  const allCompleted = items.every((challenge) => challenge.status === 'completed');
+
+  return (
+    <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10">
+      <div className="relative h-[740px] overflow-hidden">
+        <MapDecoration />
+        <PointsHud totalPoints={totalPoints} latestReward={latestReward} />
+
+        <div className="absolute right-5 top-5 z-20 rounded-[1.4rem] border border-white/70 bg-white/80 px-4 py-3 shadow-xl shadow-sky-900/10 backdrop-blur-xl">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-rose-400 to-pink-500 text-white shadow-lg shadow-rose-400/30">
+              <Sparkles className="h-6 w-6" />
+            </div>
             <div>
-              <p className="text-sm font-bold text-slate-950">Latest points update</p>
-              <p className="mt-1 text-sm text-slate-500">
-                {isCorrect
-                  ? `${detectedLabel ?? 'Item'} matched ${expectedLabel}.`
-                  : latest
-                    ? `${latest.label} detected at ${latest.confidence_pct}% confidence.`
-                    : 'Waiting for the next verified SmartBin result.'}
+              <p className="text-[11px] font-black uppercase tracking-[1.6px] text-slate-500">Quest Progress</p>
+              <p className="text-2xl font-black text-slate-950">
+                {items.filter((challenge) => challenge.status === 'completed').length}/{items.length}
               </p>
             </div>
-            <Badge
-              variant="outline"
-              className={isCorrect ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-white text-slate-600'}
-            >
-              {isCorrect ? `+${pointsAwarded} pts added` : 'No new points yet'}
+          </div>
+        </div>
+
+        <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1100 740" preserveAspectRatio="none" aria-hidden="true">
+          <path
+            d="M135 585 C230 540, 250 500, 330 500 C435 500, 420 420, 535 420 C650 420, 630 320, 735 320 C840 320, 850 230, 860 185"
+            fill="none"
+            stroke="#b7793d"
+            strokeWidth="44"
+            strokeLinecap="round"
+          />
+          <path
+            d="M135 585 C230 540, 250 500, 330 500 C435 500, 420 420, 535 420 C650 420, 630 320, 735 320 C840 320, 850 230, 860 185"
+            fill="none"
+            stroke="#ffe59a"
+            strokeWidth="32"
+            strokeLinecap="round"
+            strokeDasharray="5 18"
+          />
+          <motion.path
+            d="M135 585 C230 540, 250 500, 330 500 C435 500, 420 420, 535 420 C650 420, 630 320, 735 320 C840 320, 850 230, 860 185"
+            fill="none"
+            stroke="#34d399"
+            strokeWidth="8"
+            strokeLinecap="round"
+            strokeDasharray="0.01 1"
+            pathLength="1"
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: Math.min(1, (currentIndex + 0.35) / Math.max(1, items.length - 1)) }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+          />
+        </svg>
+
+        {items.map((challenge, index) => {
+          const completed = challenge.status === 'completed';
+          const current = challenge.challenge_id === currentChallenge?.challenge_id;
+          const state = completed ? 'completed' : current ? 'current' : index > currentIndex ? 'locked' : 'available';
+
+          return (
+            <QuestNode
+              key={challenge.challenge_id}
+              challenge={challenge}
+              index={index}
+              state={state}
+              activeMission={activeMission}
+            />
+          );
+        })}
+
+        <motion.div
+          className="absolute bottom-7 left-7 z-20 w-[390px] rounded-[1.6rem] border border-white/70 bg-white/86 p-5 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[1.6px] text-emerald-700">Current Mission</p>
+              <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                {allCompleted ? 'All quests complete' : currentChallenge?.title ?? 'SmartBin quest'}
+              </h1>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                {allCompleted
+                  ? 'Every map node is cleared for this session.'
+                  : `Complete ${ITEMS_PER_CHALLENGE} verified ${getExpectedLabel(currentChallenge)} items with the physical SmartBin.`}
+              </p>
+            </div>
+            <Badge className={`${currentTheme.bg} ${currentTheme.text} ${currentTheme.border} border px-3 py-1 capitalize`} variant="outline">
+              {allCompleted ? 'done' : getExpectedLabel(currentChallenge)}
             </Badge>
           </div>
 
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-lg bg-white p-3">
-              <p className="text-xs font-bold uppercase tracking-[1.2px] text-slate-400">Expected</p>
-              <p className="mt-1 font-black capitalize text-slate-950">{expectedLabel}</p>
+          {!allCompleted && (
+            <div className="mt-4 space-y-2">
+              <div className="flex items-center justify-between text-xs font-black uppercase tracking-[1.3px] text-slate-500">
+                <span>Node progress</span>
+                <span>{currentChallenge?.completed_count ?? 0}/{currentChallenge?.goal_count ?? ITEMS_PER_CHALLENGE}</span>
+              </div>
+              <Progress value={currentChallenge?.progress ?? 0} className="h-3 rounded-full" />
             </div>
-            <div className="rounded-lg bg-white p-3">
-              <p className="text-xs font-bold uppercase tracking-[1.2px] text-slate-400">Detected</p>
-              <p className="mt-1 font-black capitalize text-slate-950">{detectedLabel ?? '-'}</p>
+          )}
+
+          <div className="mt-5 flex items-center gap-3">
+            <Button
+              size="lg"
+              disabled={!currentChallenge || missionInFlight || allCompleted}
+              onClick={() => currentChallenge && onStart(currentChallenge)}
+              className="h-12 rounded-2xl bg-emerald-600 px-6 text-base font-black shadow-lg shadow-emerald-500/25 hover:bg-emerald-700"
+            >
+              <Play className="mr-2 h-5 w-5" />
+              {missionInFlight ? 'Session Active' : allCompleted ? 'Completed' : 'Start Challenge'}
+            </Button>
+            <div className="text-xs font-bold leading-5 text-slate-500">
+              +{currentChallenge?.points_value ?? 5} pts per correct item
+              <br />
+              {'Web -> ESP32 -> Camera -> AI'}
             </div>
-            <div className="rounded-lg bg-white p-3">
-              <p className="text-xs font-bold uppercase tracking-[1.2px] text-slate-400">Result</p>
-              <p className={`mt-1 font-black ${isCorrect ? 'text-emerald-700' : 'text-slate-500'}`}>
-                {isCorrect ? 'Correct' : 'Waiting'}
+          </div>
+        </motion.div>
+
+        <motion.div
+          className="absolute bottom-7 right-7 z-20 w-[360px] rounded-[1.6rem] border border-white/70 bg-white/86 p-5 shadow-2xl shadow-sky-900/10 backdrop-blur-xl"
+          initial={{ opacity: 0, y: 18 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <div className="mb-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-black uppercase tracking-[1.6px] text-sky-700">Smart Dustbin</p>
+              <p className="text-xl font-black text-slate-950">
+                {missionState === 'active' ? 'System active' : missionState === 'complete' ? 'Points earned' : missionState === 'retry' ? 'Try again' : 'Ready'}
               </p>
+            </div>
+            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
+              missionState === 'complete'
+                ? 'bg-emerald-500 text-white'
+                : missionState === 'retry'
+                  ? 'bg-rose-500 text-white'
+                  : missionState === 'active'
+                    ? 'bg-sky-500 text-white'
+                    : 'bg-slate-100 text-slate-500'
+            }`}>
+              <Radio className="h-6 w-6" />
             </div>
           </div>
 
-          {error && <p className="mt-3 text-sm font-semibold text-rose-600">{error}</p>}
-        </div>
+          <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-sm text-lime-300 shadow-inner">
+            <p>{missionState === 'active' ? 'LCD: INSERT WASTE' : missionState === 'complete' ? 'LCD: POINTS EARNED' : missionState === 'retry' ? 'LCD: TRY AGAIN' : 'LCD: PRESS START'}</p>
+            <p className="mt-2 text-lime-200/70">
+              {activeMission?.devkit?.message ?? 'Waiting for the next campus quest.'}
+            </p>
+          </div>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
+            <StatusTile icon={Wifi} label="ESP32" value={activeMission?.devkit?.status === 'failed' ? 'Check IP' : 'Ready'} active={missionState === 'active'} />
+            <StatusTile icon={Camera} label="Camera" value={dashboardData?.latest ? 'Synced' : 'Standby'} active={Boolean(dashboardData?.latest)} />
+            <StatusTile icon={Cpu} label="AI Result" value={dashboardData?.latest?.label ?? '-'} active={missionState === 'complete'} />
+            <StatusTile icon={CircleGauge} label="Fill Level" value={`${dashboardData?.latest?.fill_level_pct ?? 0}%`} active={Number(dashboardData?.latest?.fill_level_pct ?? 0) > 0} />
+          </div>
+        </motion.div>
       </div>
     </section>
   );
 }
 
-function ChallengeCard({ challenge, onTake, activeMission }) {
-  const completed = challenge.status === 'completed';
-  const expectedLabel = getExpectedLabel(challenge);
-  const missionActive = activeMission?.challenge_id === challenge.challenge_id && activeMission.status === 'waiting';
-
+function StatusTile({ icon: Icon, label, value, active }) {
   return (
-    <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }}>
-      <Card className={`border-border/50 transition-all hover:shadow-lg hover:shadow-primary/5 ${completed ? 'bg-emerald-50 border-emerald-100' : 'bg-white'}`}>
-        <CardContent className="p-4 lg:p-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  {completed && (
-                    <Badge variant="outline" className="bg-emerald-100 text-emerald-700 border-emerald-200">
-                      <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
-                      Correct
-                    </Badge>
-                  )}
-                  <Badge variant="outline" className={targetTone(expectedLabel)}>
-                    Target: {expectedLabel}
-                  </Badge>
-                  <Badge variant="outline" className="gap-1 text-muted-foreground">
-                    <QrCode className="h-3.5 w-3.5" />
-                    SmartBin
-                  </Badge>
-                  <Badge variant="outline" className="capitalize text-muted-foreground">
-                    {challenge.cadence}
-                  </Badge>
-                </div>
-
-                <h3 className="text-lg font-semibold">{challenge.title}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{challenge.description}</p>
-              </div>
-
-              <div className="shrink-0 text-right">
-                <div className="text-2xl font-bold text-primary">+{challenge.points_value}</div>
-                <div className="text-xs text-muted-foreground">per item</div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Clock className="h-4 w-4" />
-                  {getDeadlineLabel(challenge.deadline, completed)}
-                </div>
-                <span className="font-semibold text-muted-foreground">
-                  {challenge.completed_count} / {challenge.goal_count}
-                </span>
-              </div>
-              <Progress value={challenge.progress} className="h-2" />
-            </div>
-
-            <div className="flex items-center justify-between border-t border-border/50 pt-2">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Wifi className="h-4 w-4" />
-                Web to ESP32 to AI verification
-              </div>
-              {!completed && (
-                <Button onClick={() => onTake(challenge)} disabled={missionActive} className="gap-2">
-                  <Target className="h-4 w-4" />
-                  {missionActive ? 'Listening...' : 'Take Challenge'}
-                </Button>
-              )}
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </motion.div>
-  );
-}
-
-function MissionStatusPanel({ mission, error, onReset }) {
-  if (!mission && !error) return null;
-
-  const expected = mission?.expected_label ?? 'target item';
-  const result = mission?.result;
-  const devkit = mission?.devkit;
-  const isWaiting = mission?.status === 'waiting';
-  const isCorrect = mission?.status === 'correct';
-  const isTryAgain = mission?.status === 'try_again';
-  const devkitTone = devkit?.status === 'commanded'
-    ? 'border-emerald-100 bg-emerald-50 text-emerald-800'
-    : devkit?.status === 'failed'
-      ? 'border-rose-100 bg-rose-50 text-rose-800'
-      : 'border-amber-100 bg-amber-50 text-amber-800';
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={`rounded-2xl border p-5 shadow-sm ${
-        isCorrect
-          ? 'border-emerald-200 bg-emerald-50'
-          : isTryAgain || error
-            ? 'border-rose-200 bg-rose-50'
-            : 'border-sky-200 bg-sky-50'
-      }`}
-    >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-bold uppercase tracking-[1.5px] text-slate-700">
-            <Sparkles className="h-3.5 w-3.5" />
-            {isCorrect ? 'Correct' : isTryAgain || error ? 'Try Again' : 'Waiting for Verification'}
-          </div>
-          <h2 className="text-xl font-black text-slate-950">
-            {mission?.challenge_title ?? 'SmartBin mission'}
-          </h2>
-          <p className="mt-1 text-sm font-semibold text-slate-600">
-            Mission: place 5 <span className="capitalize text-emerald-700">{expected}</span> items into the physical SmartBin.
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-white px-4 py-3 text-right shadow-sm">
-          <p className="text-xs font-bold uppercase tracking-[1.3px] text-slate-500">Reward</p>
-          <p className={`text-2xl font-black ${isCorrect ? 'text-emerald-700' : 'text-slate-400'}`}>
-            +{mission?.points_awarded ?? 5} pts
-          </p>
-        </div>
+    <div className={`rounded-2xl border p-3 ${active ? 'border-emerald-100 bg-emerald-50' : 'border-slate-100 bg-white'}`}>
+      <div className="flex items-center gap-2">
+        <Icon className={`h-4 w-4 ${active ? 'text-emerald-700' : 'text-slate-400'}`} />
+        <p className="text-[10px] font-black uppercase tracking-[1.2px] text-slate-400">{label}</p>
       </div>
-
-      {isWaiting && devkit && (
-        <div className={`mt-4 rounded-xl border px-4 py-3 text-sm font-semibold ${devkitTone}`}>
-          {devkit.message}
-        </div>
-      )}
-
-      {isWaiting && (
-        <div className="mt-4 grid gap-3 lg:grid-cols-4">
-          {[
-            'Web sends mission command to ESP32 DevKit',
-            'Ultrasonic waits for person within 25 cm',
-            'IR detects object, then DevKit calls backend',
-            'Backend verifies, points update, then web re-arms until 5 correct items',
-          ].map((copy, index) => (
-            <div key={copy} className="rounded-xl bg-white p-3 text-sm font-semibold text-sky-800 shadow-sm">
-              <span className="mr-2 inline-flex h-6 w-6 items-center justify-center rounded-full bg-sky-100 text-xs font-black">{index + 1}</span>
-              {copy}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {(isCorrect || isTryAgain || error) && (
-        <div className="mt-4 rounded-xl bg-white p-4">
-          {error ? (
-            <p className="font-semibold text-rose-700">{error}</p>
-          ) : (
-            <>
-              <div className="grid gap-3 text-sm sm:grid-cols-3">
-                <div>
-                  <p className="font-bold text-slate-500">Detected</p>
-                  <p className="text-lg font-black capitalize text-slate-950">{result?.detected_label ?? '-'}</p>
-                </div>
-                <div>
-                  <p className="font-bold text-slate-500">Expected</p>
-                  <p className="text-lg font-black capitalize text-slate-950">{result?.expected_label ?? expected}</p>
-                </div>
-                <div>
-                  <p className="font-bold text-slate-500">Confidence</p>
-                  <p className="text-lg font-black text-slate-950">{result?.confidence_pct ?? 0}%</p>
-                </div>
-              </div>
-              <p className={`mt-3 text-sm font-semibold ${isCorrect ? 'text-emerald-700' : 'text-rose-700'}`}>
-                {isCorrect
-                  ? 'Correct item. EcoPoints were added and this challenge continues until 5 matching items are verified.'
-                  : 'The item did not match the challenge target or confidence threshold. Try the same mission again.'}
-              </p>
-            </>
-          )}
-          <Button onClick={onReset} className="mt-4" variant={isCorrect ? 'default' : 'outline'}>
-            {isCorrect ? 'Start Another Mission' : 'Try Again'}
-          </Button>
-        </div>
-      )}
-    </motion.div>
+      <p className="mt-2 truncate text-sm font-black capitalize text-slate-950">{value}</p>
+    </div>
   );
 }
 
@@ -326,7 +447,6 @@ export default function ChallengesPage() {
   })));
   const [activeMission, setActiveMission] = useState(null);
   const [missionError, setMissionError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
   const [dashboardData, setDashboardData] = useState(null);
   const [pointsError, setPointsError] = useState('');
   const [latestReward, setLatestReward] = useState(null);
@@ -407,6 +527,7 @@ export default function ChallengesPage() {
           if (result.mission.status === 'correct') {
             countVerifiedItem(result.mission.challenge_id, nextCorrectCount);
             setLatestReward({
+              id: result.mission.mission_id,
               challenge_id: result.mission.challenge_id,
               expected_label: result.mission.result?.expected_label ?? result.mission.expected_label,
               detected_label: result.mission.result?.detected_label ?? null,
@@ -428,7 +549,16 @@ export default function ChallengesPage() {
         }
       } catch {
         if (alive) {
-          setMissionError('Could not read mission status from the backend.');
+          setActiveMission((current) => current
+            ? {
+                ...current,
+                devkit: {
+                  ...(current.devkit ?? {}),
+                  status: 'failed',
+                  message: 'Could not read mission status from the backend.',
+                },
+              }
+            : current);
         }
       }
     }
@@ -442,22 +572,14 @@ export default function ChallengesPage() {
     };
   }, [activeMission?.mission_id, activeMission?.status]);
 
-  const filteredItems = useMemo(() => {
-    const query = searchQuery.toLowerCase();
+  const currentChallenge = useMemo(() => (
+    items.find((challenge) => challenge.status !== 'completed') ?? null
+  ), [items]);
 
-    return items.filter((challenge) => (
-      challenge.title.toLowerCase().includes(query) ||
-      challenge.description.toLowerCase().includes(query) ||
-      getExpectedLabel(challenge).includes(query)
-    ));
-  }, [items, searchQuery]);
-
-  const activeChallenges = filteredItems.filter((challenge) => challenge.status !== 'completed');
-  const completedChallenges = filteredItems.filter((challenge) => challenge.status === 'completed');
-  const availablePoints = activeChallenges.reduce((sum, challenge) => {
+  const availablePoints = useMemo(() => items.reduce((sum, challenge) => {
     const remaining = Math.max(0, Number(challenge.goal_count ?? ITEMS_PER_CHALLENGE) - Number(challenge.completed_count ?? 0));
     return sum + (remaining * Number(challenge.points_value ?? 0));
-  }, 0);
+  }, 0), [items]);
 
   function countVerifiedItem(challengeId, nextCount) {
     setItems((current) => current.map((challenge) => (
@@ -513,7 +635,21 @@ export default function ChallengesPage() {
       setActiveMission(result.mission);
     } catch (error) {
       setMissionError(error.message);
-      setActiveMission(null);
+      setActiveMission({
+        mission_id: null,
+        user_id: 'USR-0042',
+        challenge_id: challenge.challenge_id,
+        challenge_title: challenge.title,
+        expected_label: expectedLabel,
+        status: 'try_again',
+        points_awarded: challenge.points_value,
+        started_at: new Date().toISOString(),
+        devkit: {
+          status: 'failed',
+          message: error.message,
+        },
+        result: null,
+      });
     }
   }
 
@@ -526,74 +662,48 @@ export default function ChallengesPage() {
     await startChallenge(challenge);
   }
 
-  function resetMissionPanel() {
-    setActiveMission(null);
-    setMissionError('');
-  }
-
   return (
     <div className="space-y-6">
-      <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-2xl">
-            <p className="text-sm font-bold uppercase tracking-[1.4px] text-emerald-700">Challenges</p>
-            <h1 className="mt-2 text-3xl font-black tracking-tight text-slate-950">SmartBin Missions</h1>
-            <p className="mt-2 text-sm leading-6 text-slate-500">
-              Choose one target item, complete it on the physical SmartBin, and wait for AI verification.
-            </p>
-          </div>
-          <div className="relative flex-1 sm:flex-none">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search target..."
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              className="w-full pl-9 sm:w-64"
-            />
-          </div>
+      <section className="flex flex-col gap-4 rounded-[1.5rem] border border-emerald-100 bg-white p-5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-black uppercase tracking-[1.6px] text-emerald-700">EcoQuest Challenge Map</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">Start a SmartBin quest journey</h1>
+          <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
+            One challenge button starts the current map node. The web enables ESP32, waits for ultrasonic and IR detection,
+            requests the camera image, runs AI verification, and adds points to your total score.
+          </p>
+        </div>
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <MiniStat icon={Flag} label="Current" value={currentChallenge ? `Level ${items.findIndex((challenge) => challenge.challenge_id === currentChallenge.challenge_id) + 1}` : 'Done'} />
+          <MiniStat icon={Zap} label="Available" value={`+${availablePoints}`} />
+          <MiniStat icon={Trophy} label="Goal" value={`${ITEMS_PER_CHALLENGE} items`} />
         </div>
       </section>
 
-      <PointsUpdateSection data={dashboardData} activeMission={activeMission} latestReward={latestReward} error={pointsError} />
-
-      <MissionStatusPanel mission={activeMission} error={missionError} onReset={resetMissionPanel} />
-
-      <section className="space-y-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-bold text-slate-950">Available missions</h2>
-            <p className="text-sm text-slate-500">{activeChallenges.length} missions waiting for hardware verification</p>
-          </div>
-          <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700">
-            +{availablePoints} pts available
-          </span>
+      {pointsError && (
+        <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+          {pointsError}
         </div>
-
-        {activeChallenges.map((challenge) => (
-          <ChallengeCard key={challenge.challenge_id} challenge={challenge} onTake={takeChallenge} activeMission={activeMission} />
-        ))}
-
-        {activeChallenges.length === 0 && (
-          <Card className="border-emerald-100 bg-emerald-50">
-            <CardContent className="flex items-center gap-3 p-5 text-emerald-800">
-              <CheckCircle2 className="h-5 w-5" />
-              Every SmartBin mission is filled.
-            </CardContent>
-          </Card>
-        )}
-      </section>
-
-      {completedChallenges.length > 0 && (
-        <section className="space-y-4">
-          <div>
-            <h2 className="text-lg font-bold text-slate-950">Completed missions</h2>
-            <p className="text-sm text-slate-500">Verified missions from this session</p>
-          </div>
-          {completedChallenges.map((challenge) => (
-            <ChallengeCard key={challenge.challenge_id} challenge={challenge} onTake={takeChallenge} activeMission={activeMission} />
-          ))}
-        </section>
       )}
+
+      <QuestMap
+        items={items}
+        currentChallenge={currentChallenge}
+        activeMission={activeMission}
+        dashboardData={dashboardData}
+        latestReward={latestReward}
+        onStart={takeChallenge}
+      />
+    </div>
+  );
+}
+
+function MiniStat({ icon: Icon, label, value }) {
+  return (
+    <div className="min-w-28 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3">
+      <Icon className="mx-auto h-5 w-5 text-emerald-700" />
+      <p className="mt-2 text-[10px] font-black uppercase tracking-[1.2px] text-slate-400">{label}</p>
+      <p className="mt-1 text-sm font-black text-slate-950">{value}</p>
     </div>
   );
 }

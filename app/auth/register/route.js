@@ -48,57 +48,66 @@ export async function POST(request) {
   const avatar = avatarFromName(name);
 
   if (supabaseAdmin && trimmedEmail) {
-    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-      email: trimmedEmail,
-      password,
-      email_confirm: true,
-      user_metadata: {
+    try {
+      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+        email: trimmedEmail,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          name,
+          phone: trimmedPhone,
+          campus: selectedCampus,
+          ecoquest_user_id: userId,
+        },
+      });
+
+      if (authError) {
+        const status = authError.message.toLowerCase().includes('already') ? 409 : 500;
+        return NextResponse.json({ error: authError.message }, { status });
+      }
+
+      const profile = {
+        auth_user_id: authData.user.id,
+        user_id: userId,
         name,
+        email: trimmedEmail,
         phone: trimmedPhone,
         campus: selectedCampus,
-        ecoquest_user_id: userId,
-      },
-    });
+        role: 'user',
+        level: 1,
+        eco_points: 0,
+        streak_days: 0,
+        current_rank: null,
+        avatar,
+      };
 
-    if (authError) {
-      const status = authError.message.toLowerCase().includes('already') ? 409 : 500;
-      return NextResponse.json({ error: authError.message }, { status });
+      const { data: savedProfile, error: profileError } = await supabaseAdmin
+        .from('profiles')
+        .insert(profile)
+        .select()
+        .single();
+
+      if (profileError) {
+        return NextResponse.json({ error: profileError.message }, { status: 500 });
+      }
+
+      return NextResponse.json(
+        {
+          user: publicUserFromProfile(savedProfile),
+          auth_user_id: authData.user.id,
+          provider: 'supabase-admin',
+          note: 'Account created in Supabase Auth and public.profiles.',
+        },
+        { status: 201 },
+      );
+    } catch (error) {
+      return NextResponse.json(
+        {
+          error: `Supabase signup request failed: ${error.message}. Check internet connection, Supabase project status, and .env keys.`,
+        },
+        { status: 500 },
+      );
     }
-
-    const profile = {
-      auth_user_id: authData.user.id,
-      user_id: userId,
-      name,
-      email: trimmedEmail,
-      phone: trimmedPhone,
-      campus: selectedCampus,
-      role: 'user',
-      level: 1,
-      eco_points: 0,
-      streak_days: 0,
-      current_rank: null,
-      avatar,
-    };
-
-    const { data: savedProfile, error: profileError } = await supabaseAdmin
-      .from('profiles')
-      .insert(profile)
-      .select()
-      .single();
-
-    if (profileError) {
-      return NextResponse.json({ error: profileError.message }, { status: 500 });
-    }
-
-    return NextResponse.json(
-      {
-        user: publicUserFromProfile(savedProfile),
-        auth_user_id: authData.user.id,
-        provider: 'supabase-admin',
-        note: 'Account created in Supabase Auth and public.profiles.',
-      },
-      { status: 201 },
-    );
   }
 
   if (trimmedEmail) {
