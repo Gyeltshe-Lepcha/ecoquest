@@ -62,7 +62,7 @@ export default function LoginPage() {
             </div>
             <div className="w-px h-12 bg-white/20"/>
             <div>
-              <div className="text-3xl font-bold text-white">1000</div>
+              <div className="text-3xl font-bold text-white">1000</div> 
               <div className="text-white/70 text-sm">Waste Diverted</div>
             </div>
           </div>
