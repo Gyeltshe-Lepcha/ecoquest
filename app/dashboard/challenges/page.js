@@ -231,7 +231,7 @@ function MapDecoration() {
   );
 }
 
-function QuestNode({ challenge, index, state, activeMission, onClick }) {
+function QuestNode({ challenge, index, state, activeMission, onClick, isNextUp }) {
   const expectedLabel = getExpectedLabel(challenge);
   const theme = getTheme(expectedLabel);
   const position = nodePositions[index] ?? nodePositions[nodePositions.length - 1];
@@ -289,13 +289,16 @@ function QuestNode({ challenge, index, state, activeMission, onClick }) {
 
       {current && (
         <motion.div
-          className="absolute left-1/2 top-[-82px] w-36 -translate-x-1/2 rounded-2xl border-4 border-pink-300 bg-slate-800 px-3 py-2 text-center text-white shadow-xl"
+          className={`absolute left-1/2 top-[-82px] w-36 -translate-x-1/2 rounded-2xl border-4 px-3 py-2 text-center text-white shadow-xl ${isNextUp ? 'border-emerald-400 bg-emerald-600' : 'border-pink-300 bg-slate-800'}`}
           initial={{ y: 8, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
+          animate={isNextUp ? { y: [0, -5, 0], opacity: 1 } : { y: 0, opacity: 1 }}
+          transition={isNextUp ? { repeat: Infinity, duration: 0.7, ease: 'easeInOut' } : undefined}
         >
-          <p className="text-[10px] font-black uppercase tracking-[1.3px] text-pink-200">You are here</p>
+          <p className={`text-[10px] font-black uppercase tracking-[1.3px] ${isNextUp ? 'text-emerald-100' : 'text-pink-200'}`}>
+            {isNextUp ? 'Unlocked!' : 'You are here'}
+          </p>
           <p className="text-sm font-black capitalize">{expectedLabel} quest</p>
-          <div className="absolute left-1/2 top-full h-4 w-4 -translate-x-1/2 -translate-y-2 rotate-45 border-b-4 border-r-4 border-pink-300 bg-slate-800" />
+          <div className={`absolute left-1/2 top-full h-4 w-4 -translate-x-1/2 -translate-y-2 rotate-45 border-b-4 border-r-4 ${isNextUp ? 'border-emerald-400 bg-emerald-600' : 'border-pink-300 bg-slate-800'}`} />
         </motion.div>
       )}
 
@@ -319,7 +322,18 @@ function QuestNode({ challenge, index, state, activeMission, onClick }) {
   );
 }
 
-function QuestMap({ items, currentChallenge, selectedChallenge, onNodeClick, activeMission, dashboardData, latestReward, onStart }) {
+function QuestMap({
+  items,
+  currentChallenge,
+  selectedChallenge,
+  onNodeClick,
+  activeMission,
+  dashboardData,
+  latestReward,
+  dustbinFlash,
+  completedChallengeNotice,
+  onStart,
+}) {
   const totalPoints = Number(dashboardData?.profile?.eco_points ?? 0);
   const missionState = missionStepState(activeMission);
   const panelChallenge = selectedChallenge ?? currentChallenge;
@@ -328,6 +342,24 @@ function QuestMap({ items, currentChallenge, selectedChallenge, onNodeClick, act
   const allCompleted = items.every((challenge) => challenge.status === 'completed');
   const completedCount = items.filter((c) => c.status === 'completed').length;
   const pathProgress = completedCount / items.length;
+  const nextHighlightIndex = completedChallengeNotice
+    ? items.findIndex((c) => c.status !== 'completed')
+    : -1;
+  const detectedLabel = activeMission?.result?.detected_label ?? latestReward?.detected_label ?? null;
+  const detectedDisplay = detectedLabel && detectedLabel !== 'unknown'
+    ? detectedLabel.charAt(0).toUpperCase() + detectedLabel.slice(1)
+    : null;
+  const dustbinMessage = completedChallengeNotice
+    ? `Challenge ${completedChallengeNotice.number} completed.`
+    : dustbinFlash === 'done'
+      ? (detectedDisplay ? `${detectedDisplay} detected!` : 'Item verified!')
+      : missionState === 'active'
+        ? 'Waiting for verification...'
+        : missionState === 'complete'
+          ? (detectedDisplay ? `${detectedDisplay} detected!` : 'Points earned!')
+          : missionState === 'retry'
+            ? (detectedDisplay ? `${detectedDisplay} — wrong item` : 'Try again')
+            : 'Ready';
 
   function getNodeState(challenge, index) {
     if (challenge.status === 'completed') return 'completed';
@@ -395,6 +427,7 @@ function QuestMap({ items, currentChallenge, selectedChallenge, onNodeClick, act
             state={getNodeState(challenge, index)}
             activeMission={activeMission}
             onClick={() => onNodeClick(challenge)}
+            isNextUp={index === nextHighlightIndex}
           />
         ))}
 
@@ -479,7 +512,7 @@ function QuestMap({ items, currentChallenge, selectedChallenge, onNodeClick, act
             <div>
               <p className="text-xs font-black uppercase tracking-[1.6px] text-sky-700">Smart Dustbin</p>
               <p className="text-xl font-black text-slate-950">
-                {missionState === 'active' ? 'System active' : missionState === 'complete' ? 'Points earned' : missionState === 'retry' ? 'Try again' : 'Ready'}
+                {missionState === 'active' ? 'System active' : missionState === 'complete' ? (detectedDisplay ? `${detectedDisplay}!` : 'Points earned') : missionState === 'retry' ? (detectedDisplay ? `${detectedDisplay}?` : 'Wrong item') : 'Ready'}
               </p>
             </div>
             <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${
@@ -497,13 +530,7 @@ function QuestMap({ items, currentChallenge, selectedChallenge, onNodeClick, act
 
           <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-4 font-mono text-sm shadow-inner">
             <p className="font-black text-slate-950">
-              {missionState === 'active'
-                ? 'Waiting for verification...'
-                : missionState === 'complete'
-                  ? 'Points earned!'
-                  : missionState === 'retry'
-                    ? 'Try again'
-                    : 'Ready'}
+              {dustbinMessage}
             </p>
           </div>
 
@@ -515,21 +542,40 @@ function QuestMap({ items, currentChallenge, selectedChallenge, onNodeClick, act
 
 
 export default function ChallengesPage() {
-  const [items, setItems] = useState(() => challengeSeed.map((challenge) => ({
-    ...challenge,
-    ...emptyProgress,
-  })));
+  const [items, setItems] = useState(() => challengeSeed.map((c) => ({ ...c, ...emptyProgress })));
   const [selectedChallenge, setSelectedChallenge] = useState(null);
   const [activeMission, setActiveMission] = useState(null);
   const [missionError, setMissionError] = useState('');
   const [dashboardData, setDashboardData] = useState(null);
   const [pointsError, setPointsError] = useState('');
   const [latestReward, setLatestReward] = useState(null);
+  const [dustbinFlash, setDustbinFlash] = useState(null);
+  const [completedChallengeNotice, setCompletedChallengeNotice] = useState(null);
   const processedMissionIds = useRef(new Set());
-  const sessionRef = useRef({
-    challengeId: null,
-    correctCount: 0,
-  });
+  const flashTimeoutRef = useRef(null);
+  const completedNoticeTimerRef = useRef(null);
+  const itemsRef = useRef(items);
+  const progressRef = useRef(Object.fromEntries(
+    items.map((c) => [c.challenge_id, Number(c.completed_count ?? 0)]),
+  ));
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('ecoquest_challenge_progress');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        const loaded = challengeSeed.map((c) => {
+          const s = parsed.find((p) => p.challenge_id === c.challenge_id);
+          return s ? { ...c, ...emptyProgress, ...s } : { ...c, ...emptyProgress };
+        });
+        setItems(loaded);
+        itemsRef.current = loaded;
+        progressRef.current = Object.fromEntries(
+          loaded.map((c) => [c.challenge_id, Number(c.completed_count ?? 0)]),
+        );
+      }
+    } catch {}
+  }, []);
 
   async function loadDashboardData() {
     try {
@@ -565,6 +611,57 @@ export default function ChallengesPage() {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (flashTimeoutRef.current) {
+        window.clearTimeout(flashTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // Fix 3: keep itemsRef current and persist progress to localStorage
+  useEffect(() => {
+    itemsRef.current = items;
+    try {
+      localStorage.setItem('ecoquest_challenge_progress', JSON.stringify(
+        items.map((c) => ({
+          challenge_id: c.challenge_id,
+          progress: c.progress,
+          completed_count: c.completed_count,
+          goal_count: c.goal_count,
+          status: c.status,
+        }))
+      ));
+    } catch {}
+  }, [items]);
+
+  // Fix 2: auto-clear "Challenge completed" notice after 3.5s and open next challenge panel
+  useEffect(() => {
+    if (!completedChallengeNotice) return undefined;
+    if (completedNoticeTimerRef.current) window.clearTimeout(completedNoticeTimerRef.current);
+    completedNoticeTimerRef.current = window.setTimeout(() => {
+      setCompletedChallengeNotice(null);
+      completedNoticeTimerRef.current = null;
+      const next = itemsRef.current.find((c) => c.status !== 'completed');
+      if (next) setSelectedChallenge(next);
+    }, 3500);
+    return () => {
+      if (completedNoticeTimerRef.current) window.clearTimeout(completedNoticeTimerRef.current);
+    };
+  }, [completedChallengeNotice]);
+
+  function showDoneFlash() {
+    if (flashTimeoutRef.current) {
+      window.clearTimeout(flashTimeoutRef.current);
+    }
+
+    setDustbinFlash('done');
+    flashTimeoutRef.current = window.setTimeout(() => {
+      setDustbinFlash(null);
+      flashTimeoutRef.current = null;
+    }, 1000);
+  }
+
+  useEffect(() => {
     if (!activeMission?.mission_id || activeMission.status !== 'waiting') {
       return undefined;
     }
@@ -586,21 +683,11 @@ export default function ChallengesPage() {
         if (finished && !alreadyProcessed) {
           processedMissionIds.current.add(result.mission.mission_id);
 
-          const session = sessionRef.current;
-          const currentCorrectCount = session.challengeId === result.mission.challenge_id
-            ? session.correctCount
-            : 0;
           const nextCorrectCount = result.mission.status === 'correct'
-            ? Math.min(currentCorrectCount + 1, ITEMS_PER_CHALLENGE)
-            : currentCorrectCount;
-
-          sessionRef.current = {
-            challengeId: result.mission.challenge_id,
-            correctCount: nextCorrectCount,
-          };
+            ? countVerifiedItem(result.mission.challenge_id)
+            : Number(progressRef.current[result.mission.challenge_id] ?? 0);
 
           if (result.mission.status === 'correct') {
-            countVerifiedItem(result.mission.challenge_id, nextCorrectCount);
             setLatestReward({
               id: result.mission.mission_id,
               challenge_id: result.mission.challenge_id,
@@ -608,6 +695,17 @@ export default function ChallengesPage() {
               detected_label: result.mission.result?.detected_label ?? null,
               points_awarded: result.mission.points_awarded ?? 0,
             });
+            if (nextCorrectCount >= ITEMS_PER_CHALLENGE) {
+              const completedIndex = challengeSeed.findIndex((item) => item.challenge_id === result.mission.challenge_id);
+              setDustbinFlash(null);
+              setCompletedChallengeNotice({
+                challenge_id: result.mission.challenge_id,
+                number: completedIndex >= 0 ? completedIndex + 1 : 1,
+              });
+            } else {
+              setCompletedChallengeNotice(null);
+              showDoneFlash();
+            }
             loadDashboardData();
           }
 
@@ -619,7 +717,7 @@ export default function ChallengesPage() {
                   ? 'Correct item logged. Re-arming ESP32 DevKit for the next item...'
                   : 'Try again logged. Re-arming ESP32 DevKit for another attempt...',
               });
-            }, 600);
+            }, 100);
           }
         }
       } catch {
@@ -638,7 +736,7 @@ export default function ChallengesPage() {
       }
     }
 
-    const interval = setInterval(pollMission, 2000);
+    const interval = setInterval(pollMission, 500);
     pollMission();
 
     return () => {
@@ -656,7 +754,16 @@ export default function ChallengesPage() {
     return sum + (remaining * Number(challenge.points_value ?? 0));
   }, 0), [items]);
 
-  function countVerifiedItem(challengeId, nextCount) {
+  function countVerifiedItem(challengeId) {
+    const nextCount = Math.min(
+      Number(progressRef.current[challengeId] ?? 0) + 1,
+      ITEMS_PER_CHALLENGE,
+    );
+    progressRef.current = {
+      ...progressRef.current,
+      [challengeId]: nextCount,
+    };
+
     setItems((current) => current.map((challenge) => (
       challenge.challenge_id === challengeId
         ? {
@@ -668,12 +775,15 @@ export default function ChallengesPage() {
           }
         : challenge
     )));
+
+    return nextCount;
   }
 
   async function startChallenge(challenge, options = {}) {
     const expectedLabel = getExpectedLabel(challenge);
 
     setMissionError('');
+    setCompletedChallengeNotice(null);
     setActiveMission({
       mission_id: null,
       user_id: 'USR-0042',
@@ -730,9 +840,14 @@ export default function ChallengesPage() {
 
   async function takeChallenge(challenge) {
     setLatestReward(null);
-    sessionRef.current = {
-      challengeId: challenge.challenge_id,
-      correctCount: Number(challenge.completed_count ?? 0),
+    setDustbinFlash(null);
+    setCompletedChallengeNotice(null);
+    progressRef.current = {
+      ...progressRef.current,
+      [challenge.challenge_id]: Math.max(
+        Number(progressRef.current[challenge.challenge_id] ?? 0),
+        Number(challenge.completed_count ?? 0),
+      ),
     };
     await startChallenge(challenge);
   }
@@ -769,6 +884,8 @@ export default function ChallengesPage() {
         activeMission={activeMission}
         dashboardData={dashboardData}
         latestReward={latestReward}
+        dustbinFlash={dustbinFlash}
+        completedChallengeNotice={completedChallengeNotice}
         onStart={takeChallenge}
       />
     </div>

@@ -99,6 +99,7 @@ async function getPrediction(capture, filename, expectedLabel) {
   }
 }
 
+
 async function saveCaptureEvent({
   supabase,
   mission,

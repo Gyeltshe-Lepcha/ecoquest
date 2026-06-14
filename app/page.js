@@ -34,20 +34,20 @@ const navItems = [
 ];
 
 const ticker = [
-  { label: 'Active Users', value: '5,234' },
+  { label: 'Active Users', value: '2001' },
   { label: 'SmartBins Online', value: '52' },
-  { label: 'Challenges Done', value: '12,847' },
-  { label: 'Waste Diverted', value: '45 tons' },
+  { label: 'Challenges Done', value: '500' },
+  { label: 'Waste Diverted', value: '500 kg' },
   { label: 'Badges Earned', value: '3,091' },
-  { label: 'AI Verifications', value: '9,210' },
+  { label: 'AI Verifications', value: '212' },
   { label: 'System Uptime', value: '99%' },
 ];
 
 const metrics = [
-  { label: 'Active users', value: '5,234', icon: Users },
+  { label: 'Active users', value: '2,001', icon: Users },
   { label: 'Smart bins', value: '52', icon: Cpu },
-  { label: 'Challenges done', value: '12,847', icon: Target },
-  { label: 'Waste diverted', value: '45 tons', icon: Leaf },
+  { label: 'Challenges done', value: '500', icon: Target },
+  { label: 'Waste diverted', value: '500 kg', icon: Leaf },
 ];
 
 const modules = [
@@ -245,7 +245,7 @@ function Header() {
         <div className="flex h-20 items-center justify-between">
           <Link href="/" className="flex items-center gap-2.5">
             <img
-              src="IMG_2014.png"
+              src="/IMG_2014.png"
               alt="EcoQuest Bhutan"
               className="h-16 w-16 object-cover mix-blend-multiply"
             />
@@ -458,7 +458,7 @@ export default function HomePage() {
                 className="group relative rounded-lg border border-emerald-100 bg-white p-7 shadow-sm shadow-emerald-900/5 transition-all hover:-translate-y-1 hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-900/10"
               >
                 <span className="absolute left-0 right-0 top-0 h-[3px] origin-left scale-x-0 rounded-t-lg bg-emerald-500 transition-transform duration-300 group-hover:scale-x-100" />
-                <div className="mb-1 text-5xl font-black text-emerald-50">{module.num}</div>
+                <div className="mb-1 text-5xl font-black text-emerald-500">{module.num}</div>
                 <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-100">
                   <module.icon className="h-5 w-5 text-emerald-700" />
                 </div>

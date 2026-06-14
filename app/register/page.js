@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Leaf, Eye, EyeOff, Mail, Lock, User, Building, ArrowLeft, CheckCircle2, Phone } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Building, ArrowLeft, CheckCircle2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -75,9 +75,7 @@ export default function RegisterPage() {
         </div>
         <div className="relative z-10 flex flex-col justify-between p-12 w-full">
           <Link href="/" className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-              <Leaf className="w-5 h-5 text-white"/>
-            </div>
+            <img src="/IMG_2014.png" alt="EcoQuest Bhutan" className="h-10 w-10 object-contain" />
             <span className="font-semibold text-lg text-white">EcoQuest</span>
           </Link>
 
@@ -126,9 +124,7 @@ export default function RegisterPage() {
           <Card className="border-border/50">
             <CardHeader className="text-center">
               <div className="lg:hidden flex justify-center mb-4">
-                <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
-                  <Leaf className="w-6 h-6 text-primary-foreground"/>
-                </div>
+                <img src="/IMG_2014.png" alt="EcoQuest Bhutan" className="h-12 w-12 object-cover mix-blend-multiply" />
               </div>
               <CardTitle className="text-2xl">Create Account</CardTitle>
               <CardDescription>

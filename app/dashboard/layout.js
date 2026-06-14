@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Bell, Gift, Leaf, Target, Trophy } from 'lucide-react';
+import { Bell, Gift, Target, Trophy } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -66,9 +66,7 @@ export default function DashboardLayout({ children }) {
       <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-7xl items-center gap-5 px-6">
           <Link href="/dashboard" className="flex min-w-fit items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-600 text-white">
-              <Leaf className="h-5 w-5" />
-            </div>
+            <img src="/IMG_2014.png" alt="EcoQuest Bhutan" className="h-10 w-10 object-cover mix-blend-multiply" />
             <div>
               <p className="text-base font-black tracking-tight text-slate-950">EcoQuest Bhutan</p>
               <p className="text-xs font-medium text-slate-500">Smart campus challenge system</p>
