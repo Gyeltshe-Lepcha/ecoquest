@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Bell, Gift, Leaf, Target, Trophy } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -51,6 +52,14 @@ function NotificationMenu() {
 
 export default function DashboardLayout({ children }) {
   const pathname = usePathname();
+  const [currentUser, setCurrentUser] = useState(null);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('ecoquest_user');
+      if (stored) setCurrentUser(JSON.parse(stored));
+    } catch {}
+  }, []);
 
   return (
     <div className="min-h-screen min-w-[1180px] bg-slate-50 text-slate-900">
@@ -94,11 +103,13 @@ export default function DashboardLayout({ children }) {
             <NotificationMenu />
             <Link href="/dashboard/profile" className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 transition hover:border-emerald-200">
               <Avatar className="h-9 w-9">
-                <AvatarFallback className="bg-emerald-600 text-white">TG</AvatarFallback>
+                <AvatarFallback className="bg-emerald-600 text-white">
+                  {currentUser?.avatar || 'TG'}
+                </AvatarFallback>
               </Avatar>
               <div className="text-left">
-                <p className="text-sm font-bold text-slate-950">Team Green</p>
-                <p className="text-xs font-medium text-slate-500">Level 4 Eco Ranger</p>
+                <p className="text-sm font-bold text-slate-950">{currentUser?.name || 'Team Green'}</p>
+                <p className="text-xs font-medium text-slate-500">{currentUser?.campus || 'Level 4 Eco Ranger'}</p>
               </div>
             </Link>
           </div>

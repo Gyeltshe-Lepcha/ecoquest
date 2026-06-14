@@ -57,6 +57,9 @@ export default function RegisterPage() {
             if (!response.ok) {
                 throw new Error(result.error || 'Unable to create account.');
             }
+            if (result.user) {
+                localStorage.setItem('ecoquest_user', JSON.stringify(result.user));
+            }
             window.location.href = '/dashboard';
         } catch (err) {
             setError(err.message);

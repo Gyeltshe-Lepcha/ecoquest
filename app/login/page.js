@@ -13,10 +13,19 @@ export default function LoginPage() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-        // Simulate login
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        try {
+            const email = e.target.email.value;
+            const res = await fetch('/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const result = await res.json().catch(() => ({}));
+            if (res.ok && result.user) {
+                localStorage.setItem('ecoquest_user', JSON.stringify(result.user));
+            }
+        } catch {}
         setIsLoading(false);
-        // Redirect to dashboard
         window.location.href = '/dashboard';
     };
     return (<div className="min-h-screen flex eco-pattern">

@@ -3,11 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
-  Camera,
   CheckCircle2,
-  CircleGauge,
   Coins,
-  Cpu,
   Flag,
   LockKeyhole,
   Play,
@@ -15,7 +12,6 @@ import {
   Sparkles,
   Target,
   Trophy,
-  Wifi,
   Zap,
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -33,11 +29,10 @@ const emptyProgress = {
 };
 
 const nodePositions = [
-  { left: '14%', top: '78%' },
-  { left: '30%', top: '67%' },
-  { left: '48%', top: '58%' },
-  { left: '66%', top: '43%' },
-  { left: '78%', top: '25%' },
+  { left: '12%', top: '80%' },
+  { left: '34%', top: '61%' },
+  { left: '60%', top: '42%' },
+  { left: '82%', top: '22%' },
 ];
 
 const targetThemes = {
@@ -68,6 +63,15 @@ const targetThemes = {
     accent: 'from-emerald-400 to-lime-300',
     section: 'Section 1',
   },
+  can: {
+    bg: 'bg-lime-100',
+    text: 'text-lime-800',
+    border: 'border-lime-200',
+    glow: 'shadow-lime-300/40',
+    ring: 'ring-lime-200',
+    accent: 'from-lime-500 to-green-300',
+    section: 'Bonus',
+  },
   unknown: {
     bg: 'bg-slate-100',
     text: 'text-slate-700',
@@ -86,6 +90,7 @@ function getExpectedLabel(challenge) {
   if (text.includes('bottle')) return 'bottle';
   if (text.includes('plastic')) return 'plastic';
   if (text.includes('paper')) return 'paper';
+  if (text.includes('can')) return 'can';
   if (text.includes('unknown')) return 'unknown';
   return '';
 }
@@ -100,6 +105,43 @@ function missionStepState(mission) {
   if (mission.status === 'try_again') return 'retry';
   if (mission.status === 'waiting') return 'active';
   return 'idle';
+}
+
+const COIN_CONFIGS = [
+  { tx: -480, ty: -440, delay: 0 },
+  { tx: -560, ty: -380, delay: 0.06 },
+  { tx: -420, ty: -480, delay: 0.04 },
+  { tx: -610, ty: -420, delay: 0.10 },
+  { tx: -500, ty: -500, delay: 0.08 },
+  { tx: -540, ty: -350, delay: 0.14 },
+  { tx: -460, ty: -460, delay: 0.12 },
+];
+
+function FlyingCoins({ reward }) {
+  return (
+    <AnimatePresence>
+      {reward && (
+        <div key={reward.id} className="pointer-events-none absolute inset-0 z-30">
+          {COIN_CONFIGS.map((c, i) => (
+            <motion.div
+              key={i}
+              className="absolute bottom-44 right-52 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-amber-300 to-yellow-500 shadow-lg shadow-amber-300/60"
+              initial={{ x: 0, y: 0, scale: 0.4, opacity: 0 }}
+              animate={{
+                x: c.tx,
+                y: c.ty,
+                scale: [0.4, 1.2, 0.3],
+                opacity: [0, 1, 1, 0],
+              }}
+              transition={{ duration: 0.85, delay: c.delay, ease: 'easeIn' }}
+            >
+              <Coins className="h-3.5 w-3.5 text-white drop-shadow" />
+            </motion.div>
+          ))}
+        </div>
+      )}
+    </AnimatePresence>
+  );
 }
 
 function PointsHud({ totalPoints, latestReward }) {
@@ -189,7 +231,7 @@ function MapDecoration() {
   );
 }
 
-function QuestNode({ challenge, index, state, activeMission }) {
+function QuestNode({ challenge, index, state, activeMission, onClick }) {
   const expectedLabel = getExpectedLabel(challenge);
   const theme = getTheme(expectedLabel);
   const position = nodePositions[index] ?? nodePositions[nodePositions.length - 1];
@@ -201,11 +243,14 @@ function QuestNode({ challenge, index, state, activeMission }) {
   return (
     <motion.div
       layout
-      className="absolute z-10 -translate-x-1/2 -translate-y-1/2"
+      className={`absolute z-10 -translate-x-1/2 -translate-y-1/2 ${!locked ? 'cursor-pointer' : 'cursor-not-allowed'}`}
       style={{ left: position.left, top: position.top }}
       initial={{ opacity: 0, y: 20, scale: 0.9 }}
       animate={{ opacity: 1, y: 0, scale: current ? 1.06 : 1 }}
       transition={{ delay: index * 0.08, type: 'spring', stiffness: 220, damping: 20 }}
+      onClick={!locked ? onClick : undefined}
+      whileHover={!locked ? { scale: current ? 1.12 : 1.07 } : {}}
+      whileTap={!locked ? { scale: 0.96 } : {}}
     >
       {current && (
         <motion.div
@@ -233,6 +278,15 @@ function QuestNode({ challenge, index, state, activeMission }) {
         )}
       </div>
 
+      {/* Points worth badge — always visible above each node */}
+      <div
+        className="absolute left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border-2 border-amber-200 bg-white/95 px-2.5 py-1 shadow-md backdrop-blur-sm"
+        style={{ top: current ? '-152px' : '-52px' }}
+      >
+        <Coins className="h-3 w-3 text-amber-500" />
+        <span className="text-[11px] font-black text-amber-700">+{challenge.points_value} pts</span>
+      </div>
+
       {current && (
         <motion.div
           className="absolute left-1/2 top-[-82px] w-36 -translate-x-1/2 rounded-2xl border-4 border-pink-300 bg-slate-800 px-3 py-2 text-center text-white shadow-xl"
@@ -245,9 +299,15 @@ function QuestNode({ challenge, index, state, activeMission }) {
         </motion.div>
       )}
 
-      <div className="absolute left-1/2 top-[112px] w-36 -translate-x-1/2 text-center">
+      <div className="absolute left-1/2 top-[112px] w-40 -translate-x-1/2 text-center">
         <p className={`text-xs font-black uppercase tracking-[1px] ${locked ? 'text-slate-500' : 'text-emerald-950'}`}>
-          {locked ? 'Locked' : completed ? 'Complete' : activeMission?.status === 'waiting' && activeMission.challenge_id === challenge.challenge_id ? 'Listening' : challenge.title.replace(' SmartBin mission', '')}
+          {locked
+            ? 'Complete previous quest'
+            : completed
+              ? 'Complete'
+              : activeMission?.status === 'waiting' && activeMission.challenge_id === challenge.challenge_id
+                ? 'Listening'
+                : challenge.title.replace(' SmartBin mission', '')}
         </p>
         {!locked && (
           <p className="mt-1 text-[11px] font-bold text-emerald-900/70">
@@ -259,13 +319,21 @@ function QuestNode({ challenge, index, state, activeMission }) {
   );
 }
 
-function QuestMap({ items, currentChallenge, activeMission, dashboardData, latestReward, onStart }) {
-  const totalPoints = Number(dashboardData?.profile?.eco_points ?? 320);
-  const currentIndex = Math.max(0, items.findIndex((challenge) => challenge.challenge_id === currentChallenge?.challenge_id));
+function QuestMap({ items, currentChallenge, selectedChallenge, onNodeClick, activeMission, dashboardData, latestReward, onStart }) {
+  const totalPoints = Number(dashboardData?.profile?.eco_points ?? 0);
   const missionState = missionStepState(activeMission);
-  const currentTheme = getTheme(getExpectedLabel(currentChallenge));
+  const panelChallenge = selectedChallenge ?? currentChallenge;
+  const panelTheme = getTheme(getExpectedLabel(panelChallenge));
   const missionInFlight = activeMission?.status === 'waiting';
   const allCompleted = items.every((challenge) => challenge.status === 'completed');
+  const completedCount = items.filter((c) => c.status === 'completed').length;
+  const pathProgress = completedCount / items.length;
+
+  function getNodeState(challenge, index) {
+    if (challenge.status === 'completed') return 'completed';
+    if (index > 0 && items[index - 1].status !== 'completed') return 'locked';
+    return challenge.challenge_id === currentChallenge?.challenge_id ? 'current' : 'available';
+  }
 
   return (
     <section className="overflow-hidden rounded-[2rem] border border-emerald-100 bg-white shadow-2xl shadow-emerald-900/10">
@@ -289,14 +357,14 @@ function QuestMap({ items, currentChallenge, activeMission, dashboardData, lates
 
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1100 740" preserveAspectRatio="none" aria-hidden="true">
           <path
-            d="M135 585 C230 540, 250 500, 330 500 C435 500, 420 420, 535 420 C650 420, 630 320, 735 320 C840 320, 850 230, 860 185"
+            d="M132 592 C220 566, 274 462, 374 444 C430 426, 568 324, 660 311 C752 298, 848 176, 902 163"
             fill="none"
             stroke="#b7793d"
             strokeWidth="44"
             strokeLinecap="round"
           />
           <path
-            d="M135 585 C230 540, 250 500, 330 500 C435 500, 420 420, 535 420 C650 420, 630 320, 735 320 C840 320, 850 230, 860 185"
+            d="M132 592 C220 566, 274 462, 374 444 C430 426, 568 324, 660 311 C752 298, 848 176, 902 163"
             fill="none"
             stroke="#ffe59a"
             strokeWidth="32"
@@ -304,7 +372,7 @@ function QuestMap({ items, currentChallenge, activeMission, dashboardData, lates
             strokeDasharray="5 18"
           />
           <motion.path
-            d="M135 585 C230 540, 250 500, 330 500 C435 500, 420 420, 535 420 C650 420, 630 320, 735 320 C840 320, 850 230, 860 185"
+            d="M132 592 C220 566, 274 462, 374 444 C430 426, 568 324, 660 311 C752 298, 848 176, 902 163"
             fill="none"
             stroke="#34d399"
             strokeWidth="8"
@@ -312,76 +380,94 @@ function QuestMap({ items, currentChallenge, activeMission, dashboardData, lates
             strokeDasharray="0.01 1"
             pathLength="1"
             initial={{ pathLength: 0 }}
-            animate={{ pathLength: Math.min(1, (currentIndex + 0.35) / Math.max(1, items.length - 1)) }}
-            transition={{ duration: 0.8, ease: 'easeOut' }}
+            animate={{ pathLength: pathProgress }}
+            transition={{ duration: 0.9, ease: 'easeOut' }}
           />
         </svg>
 
-        {items.map((challenge, index) => {
-          const completed = challenge.status === 'completed';
-          const current = challenge.challenge_id === currentChallenge?.challenge_id;
-          const state = completed ? 'completed' : current ? 'current' : index > currentIndex ? 'locked' : 'available';
+        <FlyingCoins reward={latestReward} />
 
-          return (
-            <QuestNode
-              key={challenge.challenge_id}
-              challenge={challenge}
-              index={index}
-              state={state}
-              activeMission={activeMission}
-            />
-          );
-        })}
+        {items.map((challenge, index) => (
+          <QuestNode
+            key={challenge.challenge_id}
+            challenge={challenge}
+            index={index}
+            state={getNodeState(challenge, index)}
+            activeMission={activeMission}
+            onClick={() => onNodeClick(challenge)}
+          />
+        ))}
 
-        <motion.div
-          className="absolute bottom-7 left-7 z-20 w-[390px] rounded-[1.6rem] border border-white/70 bg-white/86 p-5 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl"
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <div className="flex items-start justify-between gap-4">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[1.6px] text-emerald-700">Current Mission</p>
-              <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
-                {allCompleted ? 'All quests complete' : currentChallenge?.title ?? 'SmartBin quest'}
-              </h1>
-              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
-                {allCompleted
-                  ? 'Every map node is cleared for this session.'
-                  : `Complete ${ITEMS_PER_CHALLENGE} verified ${getExpectedLabel(currentChallenge)} items with the physical SmartBin.`}
-              </p>
-            </div>
-            <Badge className={`${currentTheme.bg} ${currentTheme.text} ${currentTheme.border} border px-3 py-1 capitalize`} variant="outline">
-              {allCompleted ? 'done' : getExpectedLabel(currentChallenge)}
-            </Badge>
-          </div>
-
-          {!allCompleted && (
-            <div className="mt-4 space-y-2">
-              <div className="flex items-center justify-between text-xs font-black uppercase tracking-[1.3px] text-slate-500">
-                <span>Node progress</span>
-                <span>{currentChallenge?.completed_count ?? 0}/{currentChallenge?.goal_count ?? ITEMS_PER_CHALLENGE}</span>
-              </div>
-              <Progress value={currentChallenge?.progress ?? 0} className="h-3 rounded-full" />
-            </div>
-          )}
-
-          <div className="mt-5 flex items-center gap-3">
-            <Button
-              size="lg"
-              disabled={!currentChallenge || missionInFlight || allCompleted}
-              onClick={() => currentChallenge && onStart(currentChallenge)}
-              className="h-12 rounded-2xl bg-emerald-600 px-6 text-base font-black shadow-lg shadow-emerald-500/25 hover:bg-emerald-700"
+        <AnimatePresence>
+          {selectedChallenge && (
+            <motion.div
+              key="mission-panel"
+              className="absolute bottom-7 left-7 z-20 w-[390px] rounded-[1.6rem] border border-white/70 bg-white/95 p-5 shadow-2xl shadow-emerald-900/10 backdrop-blur-xl"
+              initial={{ opacity: 0, y: 32, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 32, scale: 0.96 }}
+              transition={{ type: 'spring', stiffness: 280, damping: 26 }}
             >
-              <Play className="mr-2 h-5 w-5" />
-              {missionInFlight ? 'Session Active' : allCompleted ? 'Completed' : 'Start Challenge'}
-            </Button>
-            <div className="text-xs font-bold leading-5 text-slate-500">
-              +{currentChallenge?.points_value ?? 5} pts per correct item
-              <br />
-              {'Web -> ESP32 -> Camera -> AI'}
-            </div>
-          </div>
-        </motion.div>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[1.6px] text-emerald-700">
+                    {panelChallenge?.status === 'completed' ? 'Quest Completed' : 'Current Mission'}
+                  </p>
+                  <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950">
+                    {allCompleted ? 'All quests complete' : panelChallenge?.title ?? 'SmartBin quest'}
+                  </h1>
+                  <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">
+                    {allCompleted
+                      ? 'Every map node is cleared for this session.'
+                      : panelChallenge?.status === 'completed'
+                        ? `You already completed this ${getExpectedLabel(panelChallenge)} quest. Well done!`
+                        : `Complete ${ITEMS_PER_CHALLENGE} verified ${getExpectedLabel(panelChallenge)} items with the physical SmartBin.`}
+                  </p>
+                </div>
+                <Badge className={`${panelTheme.bg} ${panelTheme.text} ${panelTheme.border} border px-3 py-1 capitalize`} variant="outline">
+                  {allCompleted ? 'done' : getExpectedLabel(panelChallenge)}
+                </Badge>
+              </div>
+
+              {panelChallenge?.status !== 'completed' && !allCompleted && (
+                <div className="mt-4 space-y-2">
+                  <div className="flex items-center justify-between text-xs font-black uppercase tracking-[1.3px] text-slate-500">
+                    <span>Node progress</span>
+                    <span>{panelChallenge?.completed_count ?? 0}/{panelChallenge?.goal_count ?? ITEMS_PER_CHALLENGE}</span>
+                  </div>
+                  <Progress value={panelChallenge?.progress ?? 0} className="h-3 rounded-full" />
+                </div>
+              )}
+
+              <div className="mt-5 flex items-center gap-3">
+                {panelChallenge?.status === 'completed' ? (
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    onClick={() => onNodeClick(null)}
+                    className="h-12 rounded-2xl border-emerald-200 px-6 text-base font-black text-emerald-700 hover:bg-emerald-50"
+                  >
+                    <CheckCircle2 className="mr-2 h-5 w-5" />
+                    Quest Done
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    disabled={!currentChallenge || missionInFlight || allCompleted || panelChallenge?.challenge_id !== currentChallenge?.challenge_id}
+                    onClick={() => {
+                      onNodeClick(null);
+                      onStart(panelChallenge);
+                    }}
+                    className="h-12 rounded-2xl bg-emerald-600 px-6 text-base font-black shadow-lg shadow-emerald-500/25 hover:bg-emerald-700"
+                  >
+                    <Play className="mr-2 h-5 w-5" />
+                    {missionInFlight ? 'Session Active' : allCompleted ? 'Completed' : 'Start Challenge'}
+                  </Button>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         <motion.div
           className="absolute bottom-7 right-7 z-20 w-[360px] rounded-[1.6rem] border border-white/70 bg-white/86 p-5 shadow-2xl shadow-sky-900/10 backdrop-blur-xl"
@@ -409,42 +495,31 @@ function QuestMap({ items, currentChallenge, activeMission, dashboardData, lates
             </div>
           </div>
 
-          <div className="rounded-2xl border border-slate-200 bg-slate-950 p-4 font-mono text-sm text-lime-300 shadow-inner">
-            <p>{missionState === 'active' ? 'LCD: INSERT WASTE' : missionState === 'complete' ? 'LCD: POINTS EARNED' : missionState === 'retry' ? 'LCD: TRY AGAIN' : 'LCD: PRESS START'}</p>
-            <p className="mt-2 text-lime-200/70">
-              {activeMission?.devkit?.message ?? 'Waiting for the next campus quest.'}
+          <div className="rounded-2xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-lime-50 p-4 font-mono text-sm shadow-inner">
+            <p className="font-black text-slate-950">
+              {missionState === 'active'
+                ? 'Waiting for verification...'
+                : missionState === 'complete'
+                  ? 'Points earned!'
+                  : missionState === 'retry'
+                    ? 'Try again'
+                    : 'Ready'}
             </p>
           </div>
 
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <StatusTile icon={Wifi} label="ESP32" value={activeMission?.devkit?.status === 'failed' ? 'Check IP' : 'Ready'} active={missionState === 'active'} />
-            <StatusTile icon={Camera} label="Camera" value={dashboardData?.latest ? 'Synced' : 'Standby'} active={Boolean(dashboardData?.latest)} />
-            <StatusTile icon={Cpu} label="AI Result" value={dashboardData?.latest?.label ?? '-'} active={missionState === 'complete'} />
-            <StatusTile icon={CircleGauge} label="Fill Level" value={`${dashboardData?.latest?.fill_level_pct ?? 0}%`} active={Number(dashboardData?.latest?.fill_level_pct ?? 0) > 0} />
-          </div>
         </motion.div>
       </div>
     </section>
   );
 }
 
-function StatusTile({ icon: Icon, label, value, active }) {
-  return (
-    <div className={`rounded-2xl border p-3 ${active ? 'border-emerald-100 bg-emerald-50' : 'border-slate-100 bg-white'}`}>
-      <div className="flex items-center gap-2">
-        <Icon className={`h-4 w-4 ${active ? 'text-emerald-700' : 'text-slate-400'}`} />
-        <p className="text-[10px] font-black uppercase tracking-[1.2px] text-slate-400">{label}</p>
-      </div>
-      <p className="mt-2 truncate text-sm font-black capitalize text-slate-950">{value}</p>
-    </div>
-  );
-}
 
 export default function ChallengesPage() {
   const [items, setItems] = useState(() => challengeSeed.map((challenge) => ({
     ...challenge,
     ...emptyProgress,
   })));
+  const [selectedChallenge, setSelectedChallenge] = useState(null);
   const [activeMission, setActiveMission] = useState(null);
   const [missionError, setMissionError] = useState('');
   const [dashboardData, setDashboardData] = useState(null);
@@ -572,9 +647,9 @@ export default function ChallengesPage() {
     };
   }, [activeMission?.mission_id, activeMission?.status]);
 
-  const currentChallenge = useMemo(() => (
-    items.find((challenge) => challenge.status !== 'completed') ?? null
-  ), [items]);
+  const currentChallenge = useMemo(() => {
+    return items.find((c, i) => c.status !== 'completed' && (i === 0 || items[i - 1].status === 'completed')) ?? null;
+  }, [items]);
 
   const availablePoints = useMemo(() => items.reduce((sum, challenge) => {
     const remaining = Math.max(0, Number(challenge.goal_count ?? ITEMS_PER_CHALLENGE) - Number(challenge.completed_count ?? 0));
@@ -689,6 +764,8 @@ export default function ChallengesPage() {
       <QuestMap
         items={items}
         currentChallenge={currentChallenge}
+        selectedChallenge={selectedChallenge}
+        onNodeClick={setSelectedChallenge}
         activeMission={activeMission}
         dashboardData={dashboardData}
         latestReward={latestReward}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { challengeById } from '@/lib/ecoquest-data';
-import { sendMissionToDevkit } from '@/lib/iot-devkit';
+import { getDevkitMode, sendMissionToDevkit } from '@/lib/iot-devkit';
+import { setLegacySessionEnabled } from '@/lib/iot-legacy-devkit';
 import { expectedLabelFromChallenge } from '@/lib/waste-ai';
 import { getMission, startMission, updateMission } from '@/lib/iot-missions';
 
@@ -45,7 +46,16 @@ export async function POST(request) {
     binId,
     pointsAwarded: Number(challenge.points_value ?? 5),
   });
-  const devkit = await sendMissionToDevkit({ mission, body });
+  const devkitMode = getDevkitMode(body);
+  const devkit = devkitMode === 'command'
+    ? await sendMissionToDevkit({ mission, body })
+    : {
+        status: 'polling',
+        mode: 'polling',
+        message: 'Polling DevKit session enabled. Firmware should read ENABLE from /api/session, then call /api/wasteDetected, /api/capture, and /api/classification.',
+        session_url: '/api/session',
+      };
+  setLegacySessionEnabled(true, mission);
   const updatedMission = updateMission(mission.mission_id, { devkit }) ?? mission;
 
   return NextResponse.json({
@@ -53,6 +63,8 @@ export async function POST(request) {
     devkit,
     message: devkit.status === 'commanded'
       ? `Mission generated for one ${expectedLabel} item. Waiting for the SmartBin ultrasonic and IR sensors.`
+      : devkit.status === 'polling'
+        ? `Mission generated for one ${expectedLabel} item. Polling DevKit can now read ENABLE from /api/session.`
       : `Mission generated. Sort one ${expectedLabel} item through the SmartBin.`,
   });
 }

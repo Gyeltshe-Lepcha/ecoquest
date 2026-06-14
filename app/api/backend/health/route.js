@@ -3,6 +3,8 @@ import {
   getSupabaseConfigStatus,
   maybeCreateServerSupabaseClient,
 } from '@/lib/supabase/server';
+import { getDevkitMode } from '@/lib/iot-devkit';
+import { getLegacyDevkitState } from '@/lib/iot-legacy-devkit';
 
 function statusUrlFrom(url, fallbackPath = '/status') {
   if (!url) return '';
@@ -54,9 +56,24 @@ async function checkHardwareStatus(url) {
 export async function GET() {
   const config = getSupabaseConfigStatus();
   const supabase = maybeCreateServerSupabaseClient();
+  const devkitMode = getDevkitMode();
+  const legacyDevkitStatus = {
+    configured: true,
+    ok: true,
+    mode: 'polling',
+    message: 'PDF DevKit firmware polls /api/session and does not expose a /start-challenge server.',
+    session: {
+      enabled: getLegacyDevkitState().enabled,
+      active_mission_id: getLegacyDevkitState().active_mission_id,
+      classification: getLegacyDevkitState().classification,
+      bin_levels: getLegacyDevkitState().bin_levels,
+    },
+  };
   const [cameraStatus, devkitStatus] = await Promise.all([
     checkHardwareStatus(statusUrlFrom(process.env.ESP32_CAM_CAPTURE_URL)),
-    checkHardwareStatus(statusUrlFrom(process.env.ESP32_DEVKIT_COMMAND_URL)),
+    devkitMode === 'command'
+      ? checkHardwareStatus(statusUrlFrom(process.env.ESP32_DEVKIT_COMMAND_URL))
+      : Promise.resolve(legacyDevkitStatus),
   ]);
 
   if (!supabase) {
@@ -70,6 +87,7 @@ export async function GET() {
       hardware: {
         camera: cameraStatus,
         devkit: devkitStatus,
+        devkit_mode: devkitMode,
       },
     });
   }
@@ -121,6 +139,7 @@ export async function GET() {
     hardware: {
       camera: cameraStatus,
       devkit: devkitStatus,
+      devkit_mode: devkitMode,
     },
   });
 }

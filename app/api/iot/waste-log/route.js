@@ -76,6 +76,7 @@ async function fetchCameraCapture(captureUrl) {
     throw new Error('Missing ESP32-CAM capture URL. Send esp32CamCaptureUrl or set ESP32_CAM_CAPTURE_URL.');
   }
 
+  console.log('[waste-log] fetching image from CAM:', captureUrl);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
 
@@ -260,6 +261,7 @@ export async function POST(request) {
 
   try {
     const body = await request.json().catch(() => ({}));
+    console.log('[waste-log] POST received:', JSON.stringify(body, null, 2));
     assertDeviceAuthorized(request, body);
 
     const event = body.event ?? 'waste_detected';
@@ -283,6 +285,8 @@ export async function POST(request) {
       return NextResponse.json({ ok: false, error: `Unsupported event: ${event}` }, { status: 400 });
     }
 
+    console.log('[waste-log] mission found:', waitingMission?.mission_id ?? 'NONE');
+    console.log('[waste-log] captureUrl:', captureUrl);
     const supabase = maybeCreateServerSupabaseClient();
     const capture = await fetchCameraCapture(captureUrl);
     const filename = `${binId}-${Date.now()}-capture.jpg`;
