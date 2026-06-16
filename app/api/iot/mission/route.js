@@ -34,17 +34,13 @@ export async function POST(request) {
     return NextResponse.json({ error: 'Challenge not found.' }, { status: 404 });
   }
 
-  if (!expectedLabel) {
-    return NextResponse.json({ error: 'This challenge does not have a paper/plastic/bottle/unknown target.' }, { status: 400 });
-  }
-
   const mission = startMission({
     userId,
     challengeId,
     challengeTitle: challenge.title,
     expectedLabel,
     binId,
-    pointsAwarded: Number(challenge.points_value ?? 5),
+    pointsAwarded: 0,
   });
   const devkitMode = getDevkitMode(body);
   const devkit = devkitMode === 'command'
@@ -62,9 +58,9 @@ export async function POST(request) {
     mission: updatedMission,
     devkit,
     message: devkit.status === 'commanded'
-      ? `Mission generated for one ${expectedLabel} item. Waiting for the SmartBin ultrasonic and IR sensors.`
+      ? 'Mission generated. Waiting for the SmartBin ultrasonic and IR sensors.'
       : devkit.status === 'polling'
-        ? `Mission generated for one ${expectedLabel} item. Polling DevKit can now read ENABLE from /api/session.`
-      : `Mission generated. Sort one ${expectedLabel} item through the SmartBin.`,
+        ? 'Mission generated. Polling DevKit can now read ENABLE from /api/session.'
+      : 'Mission generated. Sort one supported item through the SmartBin.',
   });
 }

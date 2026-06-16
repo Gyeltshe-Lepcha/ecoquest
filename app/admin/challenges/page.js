@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { CalendarClock, Edit3, FileQuestion, ImageUp, Plus, QrCode, Search, ThumbsUp, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { challenges as seedChallenges } from '@/lib/ecoquest-data';
 
 const proofIcons = {
   photo: ImageUp,
@@ -35,24 +34,48 @@ function emptyChallenge() {
     difficulty: 'medium',
     cadence: 'daily',
     category: 'recycling',
-    deadline: '2026-05-24T18:00',
+    deadline: new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 16),
   };
 }
 
 export default function AdminChallengesPage() {
-  const [items, setItems] = useState(seedChallenges);
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [query, setQuery] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [draft, setDraft] = useState(emptyChallenge());
+  const [saving, setSaving] = useState(false);
 
-  const filtered = useMemo(() => {
-    return items.filter((challenge) => (
-      challenge.title.toLowerCase().includes(query.toLowerCase()) ||
-      challenge.category.toLowerCase().includes(query.toLowerCase()) ||
-      challenge.proof_type.toLowerCase().includes(query.toLowerCase())
-    ));
-  }, [items, query]);
+  const fetchChallenges = useCallback(async () => {
+    try {
+      const res = await fetch('/api/admin/challenges');
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setItems(data.challenges ?? []);
+      setError(null);
+    } catch (err) {
+      setError(`Failed to load challenges: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchChallenges();
+  }, [fetchChallenges]);
+
+  const filtered = useMemo(
+    () =>
+      items.filter(
+        (c) =>
+          (c.title ?? '').toLowerCase().includes(query.toLowerCase()) ||
+          (c.category ?? '').toLowerCase().includes(query.toLowerCase()) ||
+          (c.proof_type ?? '').toLowerCase().includes(query.toLowerCase()),
+      ),
+    [items, query],
+  );
 
   const startCreate = () => {
     setEditingId(null);
@@ -62,50 +85,66 @@ export default function AdminChallengesPage() {
 
   const startEdit = (challenge) => {
     setEditingId(challenge.challenge_id);
-    setDraft({
-      ...challenge,
-      deadline: challenge.deadline.slice(0, 16),
-    });
+    setDraft({ ...challenge, deadline: challenge.deadline ? challenge.deadline.slice(0, 16) : '' });
     setDialogOpen(true);
   };
 
-  const saveChallenge = () => {
-    if (editingId) {
-      setItems((current) => current.map((challenge) => (
-        challenge.challenge_id === editingId
-          ? { ...challenge, ...draft, points_value: Number(draft.points_value) }
-          : challenge
-      )));
-    } else {
-      setItems((current) => [
-        {
-          ...draft,
-          challenge_id: `CH-${String(current.length + 1).padStart(3, '0')}`,
-          points_value: Number(draft.points_value),
-          status: 'active',
-          created_by: 'ADM-0001',
-        },
-        ...current,
-      ]);
+  const saveChallenge = async () => {
+    if (!draft.title?.trim()) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const body = { ...draft, points_value: Number(draft.points_value) };
+      if (editingId) {
+        const res = await fetch(`/api/admin/challenges/${editingId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
+        const { challenge } = await res.json();
+        setItems((prev) => prev.map((c) => (c.challenge_id === editingId ? challenge : c)));
+      } else {
+        const res = await fetch('/api/admin/challenges', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
+        const { challenge } = await res.json();
+        setItems((prev) => [challenge, ...prev]);
+      }
+      setDialogOpen(false);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSaving(false);
     }
-
-    setDialogOpen(false);
   };
 
-  const deleteChallenge = (challengeId) => {
-    setItems((current) => current.filter((challenge) => challenge.challenge_id !== challengeId));
+  const deleteChallenge = async (challengeId) => {
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/challenges/${challengeId}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error((await res.json()).error ?? `HTTP ${res.status}`);
+      setItems((prev) => prev.filter((c) => c.challenge_id !== challengeId));
+    } catch (err) {
+      setError(err.message);
+    }
   };
 
   const applyDifficulty = (difficulty) => {
-    setDraft((current) => ({
-      ...current,
-      difficulty,
-      points_value: difficultyPoints[difficulty],
-    }));
+    setDraft((prev) => ({ ...prev, difficulty, points_value: difficultyPoints[difficulty] }));
   };
 
   return (
     <div className="space-y-6">
+      {error && (
+        <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
+        </div>
+      )}
+
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Challenge Management</h1>
@@ -114,7 +153,7 @@ export default function AdminChallengesPage() {
         <div className="flex gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search..." className="w-52 pl-9" />
+            <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search..." className="w-52 pl-9" />
           </div>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
@@ -131,11 +170,11 @@ export default function AdminChallengesPage() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="title">Title</Label>
-                  <Input id="title" value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
+                  <Input id="title" value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} />
                 </div>
                 <div className="space-y-2 sm:col-span-2">
                   <Label htmlFor="description">Description</Label>
-                  <Textarea id="description" value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} />
+                  <Textarea id="description" value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Proof type</Label>
@@ -162,7 +201,7 @@ export default function AdminChallengesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="points">Points</Label>
-                  <Input id="points" type="number" value={draft.points_value} onChange={(event) => setDraft({ ...draft, points_value: event.target.value })} />
+                  <Input id="points" type="number" value={draft.points_value} onChange={(e) => setDraft({ ...draft, points_value: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label>Cadence</Label>
@@ -176,65 +215,77 @@ export default function AdminChallengesPage() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="category">Category</Label>
-                  <Input id="category" value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} />
+                  <Input id="category" value={draft.category} onChange={(e) => setDraft({ ...draft, category: e.target.value })} />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="deadline">Deadline</Label>
-                  <Input id="deadline" type="datetime-local" value={draft.deadline} onChange={(event) => setDraft({ ...draft, deadline: event.target.value })} />
+                  <Input id="deadline" type="datetime-local" value={draft.deadline} onChange={(e) => setDraft({ ...draft, deadline: e.target.value })} />
                 </div>
               </div>
-              <Button onClick={saveChallenge} className="w-full">
-                {editingId ? 'Save changes' : 'Create challenge'}
+              <Button onClick={saveChallenge} disabled={saving || !draft.title?.trim()} className="w-full">
+                {saving ? 'Saving…' : editingId ? 'Save changes' : 'Create challenge'}
               </Button>
             </DialogContent>
           </Dialog>
         </div>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {filtered.map((challenge, index) => {
-          const ProofIcon = proofIcons[challenge.proof_type] ?? ImageUp;
-          return (
-            <motion.div key={challenge.challenge_id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}>
-              <Card className="border-border/50 transition-shadow hover:shadow-lg hover:shadow-primary/5">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <CardTitle className="text-base">{challenge.title}</CardTitle>
-                      <CardDescription className="mt-1 line-clamp-2">{challenge.description}</CardDescription>
+      {loading ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-40 rounded-xl border border-border/50 bg-muted/30 animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <p className="py-12 text-center text-muted-foreground">
+          {items.length === 0 ? 'No challenges yet. Create one above.' : 'No challenges match your search.'}
+        </p>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {filtered.map((challenge, index) => {
+            const ProofIcon = proofIcons[challenge.proof_type] ?? ImageUp;
+            return (
+              <motion.div key={challenge.challenge_id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.04 }}>
+                <Card className="border-border/50 transition-shadow hover:shadow-lg hover:shadow-primary/5">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <CardTitle className="text-base">{challenge.title}</CardTitle>
+                        <CardDescription className="mt-1 line-clamp-2">{challenge.description}</CardDescription>
+                      </div>
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                        <ProofIcon className="h-5 w-5 text-primary" />
+                      </div>
                     </div>
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10">
-                      <ProofIcon className="h-5 w-5 text-primary" />
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      <Badge variant="outline" className="capitalize">{(challenge.proof_type ?? '').replace('_', ' ')}</Badge>
+                      <Badge variant="outline" className="capitalize">{challenge.difficulty}</Badge>
+                      <Badge variant="outline">{challenge.points_value} pts</Badge>
+                      <Badge variant="outline" className="capitalize">{challenge.cadence}</Badge>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="flex flex-wrap gap-2">
-                    <Badge variant="outline" className="capitalize">{challenge.proof_type.replace('_', ' ')}</Badge>
-                    <Badge variant="outline" className="capitalize">{challenge.difficulty}</Badge>
-                    <Badge variant="outline">{challenge.points_value} pts</Badge>
-                    <Badge variant="outline" className="capitalize">{challenge.cadence}</Badge>
-                  </div>
-                  <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-4">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <CalendarClock className="h-4 w-4" />
-                      {new Date(challenge.deadline).toLocaleString()}
+                    <div className="flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <CalendarClock className="h-4 w-4" />
+                        {challenge.deadline ? new Date(challenge.deadline).toLocaleString() : '—'}
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="icon" variant="outline" onClick={() => startEdit(challenge)}>
+                          <Edit3 className="h-4 w-4" />
+                        </Button>
+                        <Button size="icon" variant="outline" onClick={() => deleteChallenge(challenge.challenge_id)}>
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </div>
-                    <div className="flex gap-2">
-                      <Button size="icon" variant="outline" onClick={() => startEdit(challenge)}>
-                        <Edit3 className="h-4 w-4" />
-                      </Button>
-                      <Button size="icon" variant="outline" onClick={() => deleteChallenge(challenge.challenge_id)}>
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          );
-        })}
-      </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

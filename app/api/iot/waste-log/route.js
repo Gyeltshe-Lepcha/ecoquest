@@ -128,6 +128,7 @@ async function saveIotEvent({
   body,
   prediction,
   decision,
+  pointsAwarded,
   proofUrl,
   userId,
   challengeId,
@@ -135,12 +136,13 @@ async function saveIotEvent({
   fillLevelPct,
   challenge,
 }) {
+  const awardedPoints = decision.status === 'approved' ? Number(pointsAwarded ?? 0) : 0;
+
   if (!supabase) {
-    return { persisted: false, pointsAwarded: 0 };
+    return { persisted: false, pointsAwarded: awardedPoints };
   }
 
   const submissionId = `SUB-IOT-${Date.now()}`;
-  const pointsAwarded = decision.status === 'approved' ? Number(body.points_awarded ?? 5) : 0;
 
   if (challenge) {
     const { error: challengeError } = await supabase.from('challenges').upsert({
@@ -234,7 +236,7 @@ async function saveIotEvent({
     }
   }
 
-  if (pointsAwarded > 0) {
+  if (awardedPoints > 0) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('eco_points')
@@ -244,14 +246,14 @@ async function saveIotEvent({
     if (profile) {
       await supabase
         .from('profiles')
-        .update({ eco_points: Number(profile.eco_points ?? 0) + pointsAwarded })
+        .update({ eco_points: Number(profile.eco_points ?? 0) + awardedPoints })
         .eq('user_id', userId);
     }
   }
 
   return {
     persisted: true,
-    pointsAwarded,
+    pointsAwarded: awardedPoints,
     submissionId,
   };
 }
@@ -293,12 +295,20 @@ export async function POST(request) {
     const proofUrl = await uploadProofBlob(supabase, capture.blob, userId, filename);
     const prediction = await predictImageBlob(capture.blob, filename);
 
-    const { normalizedExpected, labelMatches, decision } = createVerificationDecision(prediction, expectedLabel);
+    const {
+      normalizedExpected,
+      labelMatches,
+      decision,
+      confidence,
+      confidence_pct: confidencePct,
+      points_awarded: pointsAwarded,
+    } = createVerificationDecision(prediction, expectedLabel);
     const saveResult = await saveIotEvent({
       supabase,
       body,
       prediction,
       decision,
+      pointsAwarded,
       proofUrl,
       userId,
       challengeId,
@@ -310,7 +320,8 @@ export async function POST(request) {
       ? completeMission(waitingMission.mission_id, {
           correct: decision.status === 'approved',
           detected_label: prediction.label,
-          confidence_pct: prediction.confidence_pct,
+          confidence,
+          confidence_pct: confidencePct,
           expected_label: normalizedExpected,
           label_matches: labelMatches,
           decision,
@@ -328,10 +339,11 @@ export async function POST(request) {
       points_awarded: saveResult.pointsAwarded,
       expected_label: normalizedExpected,
       detected_label: prediction.label,
-      confidence_pct: prediction.confidence_pct,
+      confidence,
+      confidence_pct: confidencePct,
       message: correct
-        ? 'Correct item. Success beep and close lid.'
-        : 'Wrong item or low confidence. Try again, no points awarded.',
+        ? decision.message
+        : `${decision.message} No EcoPoints awarded.`,
     };
 
     return NextResponse.json({
@@ -351,6 +363,8 @@ export async function POST(request) {
       decision,
       expected_label: normalizedExpected,
       label_matches: labelMatches,
+      confidence,
+      confidence_pct: confidencePct,
       fill_level_pct: fillLevelPct,
       points_awarded: saveResult.pointsAwarded,
       beep: esp32Feedback.beep,

@@ -19,15 +19,6 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { challenges as challengeSeed } from '@/lib/ecoquest-data';
 
-const ITEMS_PER_CHALLENGE = 5;
-
-const emptyProgress = {
-  progress: 0,
-  completed_count: 0,
-  goal_count: ITEMS_PER_CHALLENGE,
-  status: 'active',
-};
-
 const nodePositions = [
   { left: '12%', top: '80%' },
   { left: '34%', top: '61%' },
@@ -36,41 +27,14 @@ const nodePositions = [
 ];
 
 const targetThemes = {
-  plastic: {
-    bg: 'bg-sky-100',
-    text: 'text-sky-800',
-    border: 'border-sky-200',
-    glow: 'shadow-sky-300/40',
-    ring: 'ring-sky-200',
-    accent: 'from-sky-400 to-cyan-300',
-    section: 'Section 1',
-  },
-  paper: {
-    bg: 'bg-amber-100',
-    text: 'text-amber-800',
-    border: 'border-amber-200',
-    glow: 'shadow-amber-300/40',
-    ring: 'ring-amber-200',
-    accent: 'from-amber-300 to-yellow-200',
-    section: 'Section 1',
-  },
-  bottle: {
+  ecopoints: {
     bg: 'bg-emerald-100',
     text: 'text-emerald-800',
     border: 'border-emerald-200',
     glow: 'shadow-emerald-300/40',
     ring: 'ring-emerald-200',
     accent: 'from-emerald-400 to-lime-300',
-    section: 'Section 1',
-  },
-  can: {
-    bg: 'bg-lime-100',
-    text: 'text-lime-800',
-    border: 'border-lime-200',
-    glow: 'shadow-lime-300/40',
-    ring: 'ring-lime-200',
-    accent: 'from-lime-500 to-green-300',
-    section: 'Bonus',
+    section: 'Milestone',
   },
   unknown: {
     bg: 'bg-slate-100',
@@ -83,20 +47,33 @@ const targetThemes = {
   },
 };
 
-function getExpectedLabel(challenge) {
-  if (challenge?.target_label) return String(challenge.target_label).toLowerCase();
-
-  const text = `${challenge?.title ?? ''} ${challenge?.description ?? ''} ${challenge?.category ?? ''}`.toLowerCase();
-  if (text.includes('bottle')) return 'bottle';
-  if (text.includes('plastic')) return 'plastic';
-  if (text.includes('paper')) return 'paper';
-  if (text.includes('can')) return 'can';
-  if (text.includes('unknown')) return 'unknown';
-  return '';
+function getMilestonePoints(challenge) {
+  return Number(challenge?.milestone_points ?? challenge?.points_value ?? 0);
 }
 
-function getTheme(label) {
-  return targetThemes[label] ?? targetThemes.unknown;
+function withMilestoneProgress(challenge, totalPoints) {
+  const milestone = getMilestonePoints(challenge);
+  const progress = milestone > 0
+    ? Math.min(100, Math.round((Number(totalPoints ?? 0) / milestone) * 100))
+    : 0;
+
+  return {
+    ...challenge,
+    progress,
+    status: Number(totalPoints ?? 0) >= milestone ? 'completed' : 'active',
+  };
+}
+
+function milestoneItems(totalPoints) {
+  return challengeSeed.map((challenge) => withMilestoneProgress(challenge, totalPoints));
+}
+
+function getExpectedLabel() {
+  return 'any item';
+}
+
+function getTheme(category) {
+  return targetThemes[category] ?? targetThemes.ecopoints ?? targetThemes.unknown;
 }
 
 function missionStepState(mission) {
@@ -232,8 +209,8 @@ function MapDecoration() {
 }
 
 function QuestNode({ challenge, index, state, activeMission, onClick, isNextUp }) {
-  const expectedLabel = getExpectedLabel(challenge);
-  const theme = getTheme(expectedLabel);
+  const milestone = getMilestonePoints(challenge);
+  const theme = getTheme(challenge?.category);
   const position = nodePositions[index] ?? nodePositions[nodePositions.length - 1];
   const completed = state === 'completed';
   const current = state === 'current';
@@ -284,7 +261,7 @@ function QuestNode({ challenge, index, state, activeMission, onClick, isNextUp }
         style={{ top: current ? '-152px' : '-52px' }}
       >
         <Coins className="h-3 w-3 text-amber-500" />
-        <span className="text-[11px] font-black text-amber-700">+{challenge.points_value} pts</span>
+        <span className="text-[11px] font-black text-amber-700">{milestone.toLocaleString()} pts</span>
       </div>
 
       {current && (
@@ -297,7 +274,7 @@ function QuestNode({ challenge, index, state, activeMission, onClick, isNextUp }
           <p className={`text-[10px] font-black uppercase tracking-[1.3px] ${isNextUp ? 'text-emerald-100' : 'text-pink-200'}`}>
             {isNextUp ? 'Unlocked!' : 'You are here'}
           </p>
-          <p className="text-sm font-black capitalize">{expectedLabel} quest</p>
+          <p className="text-sm font-black">Reach {milestone.toLocaleString()}</p>
           <div className={`absolute left-1/2 top-full h-4 w-4 -translate-x-1/2 -translate-y-2 rotate-45 border-b-4 border-r-4 ${isNextUp ? 'border-emerald-400 bg-emerald-600' : 'border-pink-300 bg-slate-800'}`} />
         </motion.div>
       )}
@@ -308,13 +285,13 @@ function QuestNode({ challenge, index, state, activeMission, onClick, isNextUp }
             ? 'Complete previous quest'
             : completed
               ? 'Complete'
-              : activeMission?.status === 'waiting' && activeMission.challenge_id === challenge.challenge_id
+            : activeMission?.status === 'waiting' && activeMission.challenge_id === challenge.challenge_id
                 ? 'Listening'
-                : challenge.title.replace(' SmartBin mission', '')}
+                : challenge.title}
         </p>
         {!locked && (
           <p className="mt-1 text-[11px] font-bold text-emerald-900/70">
-            {challenge.completed_count}/{challenge.goal_count} items
+            Goal {milestone.toLocaleString()} EcoPoints
           </p>
         )}
       </div>
@@ -337,7 +314,8 @@ function QuestMap({
   const totalPoints = Number(dashboardData?.profile?.eco_points ?? 0);
   const missionState = missionStepState(activeMission);
   const panelChallenge = selectedChallenge ?? currentChallenge;
-  const panelTheme = getTheme(getExpectedLabel(panelChallenge));
+  const panelTheme = getTheme(panelChallenge?.category);
+  const panelMilestone = getMilestonePoints(panelChallenge);
   const missionInFlight = activeMission?.status === 'waiting';
   const allCompleted = items.every((challenge) => challenge.status === 'completed');
   const completedCount = items.filter((c) => c.status === 'completed').length;
@@ -359,6 +337,42 @@ function QuestMap({
           ? (detectedDisplay ? `${detectedDisplay} detected!` : 'Points earned!')
           : missionState === 'retry'
             ? (detectedDisplay ? `${detectedDisplay} — wrong item` : 'Try again')
+            : 'Ready';
+  const confidencePct = Math.round(Number(activeMission?.result?.confidence_pct ?? latestReward?.confidence_pct ?? 0));
+  const awardedPoints = Number(activeMission?.result?.points_awarded ?? latestReward?.points_awarded ?? 0);
+  const decisionMessage = activeMission?.result?.decision?.message;
+  const captureStatus = activeMission?.capture_status ?? activeMission?.classification?.status ?? null;
+  const dustbinLines = completedChallengeNotice
+    ? [`Challenge ${completedChallengeNotice.number} completed.`]
+    : dustbinFlash === 'done'
+      ? [
+          detectedDisplay ? `${detectedDisplay} detected!` : 'Item verified!',
+          confidencePct ? `Confidence: ${confidencePct}%` : '',
+          awardedPoints ? `+${awardedPoints} EcoPoints` : '',
+        ].filter(Boolean)
+      : missionState === 'active' && captureStatus === 'capturing'
+        ? ['Capturing image...']
+        : missionState === 'active'
+          ? ['Waiting for verification...']
+          : missionState === 'complete'
+            ? [
+                detectedDisplay ? `${detectedDisplay} detected!` : 'Item verified!',
+                confidencePct ? `Confidence: ${confidencePct}%` : '',
+                awardedPoints ? `+${awardedPoints} EcoPoints` : '',
+              ].filter(Boolean)
+            : missionState === 'retry'
+              ? [decisionMessage || 'Confidence too low. Try again.']
+              : ['Ready'];
+  const dustbinTitle = completedChallengeNotice
+    ? `Challenge ${completedChallengeNotice.number} completed.`
+    : missionState === 'active' && captureStatus === 'capturing'
+      ? 'Capturing'
+      : missionState === 'active'
+        ? 'Verifying'
+        : missionState === 'complete'
+          ? (detectedDisplay ? `${detectedDisplay}!` : 'Points earned')
+          : missionState === 'retry'
+            ? 'Try again'
             : 'Ready';
 
   function getNodeState(challenge, index) {
@@ -453,20 +467,20 @@ function QuestMap({
                     {allCompleted
                       ? 'Every map node is cleared for this session.'
                       : panelChallenge?.status === 'completed'
-                        ? `You already completed this ${getExpectedLabel(panelChallenge)} quest. Well done!`
-                        : `Complete ${ITEMS_PER_CHALLENGE} verified ${getExpectedLabel(panelChallenge)} items with the physical SmartBin.`}
+                        ? 'You already reached this EcoPoints milestone. Well done!'
+                        : 'Deposit any verified waste item in the SmartBin to earn EcoPoints toward this milestone.'}
                   </p>
                 </div>
                 <Badge className={`${panelTheme.bg} ${panelTheme.text} ${panelTheme.border} border px-3 py-1 capitalize`} variant="outline">
-                  {allCompleted ? 'done' : getExpectedLabel(panelChallenge)}
+                  {allCompleted ? 'done' : 'EcoPoints'}
                 </Badge>
               </div>
 
               {panelChallenge?.status !== 'completed' && !allCompleted && (
                 <div className="mt-4 space-y-2">
                   <div className="flex items-center justify-between text-xs font-black uppercase tracking-[1.3px] text-slate-500">
-                    <span>Node progress</span>
-                    <span>{panelChallenge?.completed_count ?? 0}/{panelChallenge?.goal_count ?? ITEMS_PER_CHALLENGE}</span>
+                    <span>EcoPoints progress</span>
+                    <span>{totalPoints.toLocaleString()} / {getMilestonePoints(panelChallenge).toLocaleString()} pts</span>
                   </div>
                   <Progress value={panelChallenge?.progress ?? 0} className="h-3 rounded-full" />
                 </div>
@@ -542,7 +556,7 @@ function QuestMap({
 
 
 export default function ChallengesPage() {
-  const [items, setItems] = useState(() => challengeSeed.map((c) => ({ ...c, ...emptyProgress })));
+  const [items, setItems] = useState(() => milestoneItems(0));
   const [selectedChallenge, setSelectedChallenge] = useState(null);
   const [activeMission, setActiveMission] = useState(null);
   const [missionError, setMissionError] = useState('');
@@ -554,28 +568,11 @@ export default function ChallengesPage() {
   const processedMissionIds = useRef(new Set());
   const flashTimeoutRef = useRef(null);
   const completedNoticeTimerRef = useRef(null);
-  const itemsRef = useRef(items);
-  const progressRef = useRef(Object.fromEntries(
-    items.map((c) => [c.challenge_id, Number(c.completed_count ?? 0)]),
-  ));
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem('ecoquest_challenge_progress');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const loaded = challengeSeed.map((c) => {
-          const s = parsed.find((p) => p.challenge_id === c.challenge_id);
-          return s ? { ...c, ...emptyProgress, ...s } : { ...c, ...emptyProgress };
-        });
-        setItems(loaded);
-        itemsRef.current = loaded;
-        progressRef.current = Object.fromEntries(
-          loaded.map((c) => [c.challenge_id, Number(c.completed_count ?? 0)]),
-        );
-      }
-    } catch {}
-  }, []);
+    const totalPoints = Number(dashboardData?.profile?.eco_points ?? 0);
+    setItems(milestoneItems(totalPoints));
+  }, [dashboardData]);
 
   async function loadDashboardData() {
     try {
@@ -618,36 +615,19 @@ export default function ChallengesPage() {
     };
   }, []);
 
-  // Fix 3: keep itemsRef current and persist progress to localStorage
-  useEffect(() => {
-    itemsRef.current = items;
-    try {
-      localStorage.setItem('ecoquest_challenge_progress', JSON.stringify(
-        items.map((c) => ({
-          challenge_id: c.challenge_id,
-          progress: c.progress,
-          completed_count: c.completed_count,
-          goal_count: c.goal_count,
-          status: c.status,
-        }))
-      ));
-    } catch {}
-  }, [items]);
-
-  // Fix 2: auto-clear "Challenge completed" notice after 3.5s and open next challenge panel
   useEffect(() => {
     if (!completedChallengeNotice) return undefined;
     if (completedNoticeTimerRef.current) window.clearTimeout(completedNoticeTimerRef.current);
     completedNoticeTimerRef.current = window.setTimeout(() => {
       setCompletedChallengeNotice(null);
       completedNoticeTimerRef.current = null;
-      const next = itemsRef.current.find((c) => c.status !== 'completed');
+      const next = items.find((c) => c.status !== 'completed');
       if (next) setSelectedChallenge(next);
     }, 3500);
     return () => {
       if (completedNoticeTimerRef.current) window.clearTimeout(completedNoticeTimerRef.current);
     };
-  }, [completedChallengeNotice]);
+  }, [completedChallengeNotice, items]);
 
   function showDoneFlash() {
     if (flashTimeoutRef.current) {
@@ -683,20 +663,23 @@ export default function ChallengesPage() {
         if (finished && !alreadyProcessed) {
           processedMissionIds.current.add(result.mission.mission_id);
 
-          const nextCorrectCount = result.mission.status === 'correct'
-            ? countVerifiedItem(result.mission.challenge_id)
-            : Number(progressRef.current[result.mission.challenge_id] ?? 0);
-
           if (result.mission.status === 'correct') {
+            const pointsJustAwarded = Number(result.mission.result?.points_awarded ?? result.mission.points_awarded ?? 0);
+            const currentTotal = Number(dashboardData?.profile?.eco_points ?? 0);
+            const newTotal = currentTotal + pointsJustAwarded;
+            const challenge = challengeSeed.find((c) => c.challenge_id === result.mission.challenge_id);
+            const milestoneReached = challenge ? newTotal >= getMilestonePoints(challenge) : false;
+
             setLatestReward({
               id: result.mission.mission_id,
               challenge_id: result.mission.challenge_id,
               expected_label: result.mission.result?.expected_label ?? result.mission.expected_label,
               detected_label: result.mission.result?.detected_label ?? null,
-              points_awarded: result.mission.points_awarded ?? 0,
+              points_awarded: pointsJustAwarded,
             });
-            if (nextCorrectCount >= ITEMS_PER_CHALLENGE) {
-              const completedIndex = challengeSeed.findIndex((item) => item.challenge_id === result.mission.challenge_id);
+
+            if (milestoneReached) {
+              const completedIndex = challengeSeed.findIndex((c) => c.challenge_id === result.mission.challenge_id);
               setDustbinFlash(null);
               setCompletedChallengeNotice({
                 challenge_id: result.mission.challenge_id,
@@ -705,19 +688,15 @@ export default function ChallengesPage() {
             } else {
               setCompletedChallengeNotice(null);
               showDoneFlash();
+              if (challenge) {
+                window.setTimeout(() => {
+                  startChallenge(challenge, {
+                    pendingMessage: 'Correct item logged. Re-arming ESP32 DevKit for the next deposit...',
+                  });
+                }, 100);
+              }
             }
             loadDashboardData();
-          }
-
-          const challenge = challengeSeed.find((item) => item.challenge_id === result.mission.challenge_id);
-          if (challenge && nextCorrectCount < ITEMS_PER_CHALLENGE) {
-            window.setTimeout(() => {
-              startChallenge(challenge, {
-                pendingMessage: result.mission.status === 'correct'
-                  ? 'Correct item logged. Re-arming ESP32 DevKit for the next item...'
-                  : 'Try again logged. Re-arming ESP32 DevKit for another attempt...',
-              });
-            }, 100);
           }
         }
       } catch {
@@ -749,35 +728,12 @@ export default function ChallengesPage() {
     return items.find((c, i) => c.status !== 'completed' && (i === 0 || items[i - 1].status === 'completed')) ?? null;
   }, [items]);
 
-  const availablePoints = useMemo(() => items.reduce((sum, challenge) => {
-    const remaining = Math.max(0, Number(challenge.goal_count ?? ITEMS_PER_CHALLENGE) - Number(challenge.completed_count ?? 0));
-    return sum + (remaining * Number(challenge.points_value ?? 0));
-  }, 0), [items]);
+  const totalPoints = Number(dashboardData?.profile?.eco_points ?? 0);
 
-  function countVerifiedItem(challengeId) {
-    const nextCount = Math.min(
-      Number(progressRef.current[challengeId] ?? 0) + 1,
-      ITEMS_PER_CHALLENGE,
-    );
-    progressRef.current = {
-      ...progressRef.current,
-      [challengeId]: nextCount,
-    };
-
-    setItems((current) => current.map((challenge) => (
-      challenge.challenge_id === challengeId
-        ? {
-            ...challenge,
-            status: nextCount >= ITEMS_PER_CHALLENGE ? 'completed' : 'active',
-            progress: Math.min(100, Math.round((nextCount / ITEMS_PER_CHALLENGE) * 100)),
-            completed_count: nextCount,
-            goal_count: ITEMS_PER_CHALLENGE,
-          }
-        : challenge
-    )));
-
-    return nextCount;
-  }
+  const availablePoints = useMemo(() => {
+    if (!currentChallenge) return 0;
+    return Math.max(0, getMilestonePoints(currentChallenge) - totalPoints);
+  }, [currentChallenge, totalPoints]);
 
   async function startChallenge(challenge, options = {}) {
     const expectedLabel = getExpectedLabel(challenge);
@@ -791,7 +747,7 @@ export default function ChallengesPage() {
       challenge_title: challenge.title,
       expected_label: expectedLabel,
       status: 'waiting',
-      points_awarded: challenge.points_value,
+      points_awarded: 0,
       started_at: new Date().toISOString(),
       devkit: {
         status: 'pending',
@@ -827,7 +783,7 @@ export default function ChallengesPage() {
         challenge_title: challenge.title,
         expected_label: expectedLabel,
         status: 'try_again',
-        points_awarded: challenge.points_value,
+        points_awarded: 0,
         started_at: new Date().toISOString(),
         devkit: {
           status: 'failed',
@@ -842,13 +798,6 @@ export default function ChallengesPage() {
     setLatestReward(null);
     setDustbinFlash(null);
     setCompletedChallengeNotice(null);
-    progressRef.current = {
-      ...progressRef.current,
-      [challenge.challenge_id]: Math.max(
-        Number(progressRef.current[challenge.challenge_id] ?? 0),
-        Number(challenge.completed_count ?? 0),
-      ),
-    };
     await startChallenge(challenge);
   }
 
@@ -859,14 +808,13 @@ export default function ChallengesPage() {
           <p className="text-sm font-black uppercase tracking-[1.6px] text-emerald-700">EcoQuest Challenge Map</p>
           <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">Start a SmartBin quest journey</h1>
           <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-slate-500">
-            One challenge button starts the current map node. The web enables ESP32, waits for ultrasonic and IR detection,
-            requests the camera image, runs AI verification, and adds points to your total score.
+            Complete the quests by verifying items with the physical SmartBin to earn EcoPoints and unlock rewards. Each node on the map represents a unique challenge!
           </p>
         </div>
         <div className="grid grid-cols-3 gap-3 text-center">
-          <MiniStat icon={Flag} label="Current" value={currentChallenge ? `Level ${items.findIndex((challenge) => challenge.challenge_id === currentChallenge.challenge_id) + 1}` : 'Done'} />
-          <MiniStat icon={Zap} label="Available" value={`+${availablePoints}`} />
-          <MiniStat icon={Trophy} label="Goal" value={`${ITEMS_PER_CHALLENGE} items`} />
+          <MiniStat icon={Flag} label="Current" value={currentChallenge ? `Level ${items.findIndex((c) => c.challenge_id === currentChallenge.challenge_id) + 1}` : 'Done'} />
+          <MiniStat icon={Zap} label="To Next" value={currentChallenge ? `${availablePoints.toLocaleString()} pts` : '—'} />
+          <MiniStat icon={Trophy} label="Goal" value={currentChallenge ? `${getMilestonePoints(currentChallenge).toLocaleString()} pts` : 'All done'} />
         </div>
       </section>
 

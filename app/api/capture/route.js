@@ -78,50 +78,30 @@ async function fetchCameraCapture(captureUrl) {
   }
 }
 
-function fallbackPrediction(expectedLabel, aiError) {
-  const label = expectedLabel || 'unknown';
-  const confidencePct = expectedLabel ? 100 : 0;
-
-  return {
-    label,
-    confidence_pct: confidencePct,
-    probabilities: expectedLabel ? { [expectedLabel]: 100 } : { unknown: 100 },
-    source: 'ai-unavailable-expected-label-fallback',
-    warning: aiError.message,
-  };
-}
-
-async function getPrediction(capture, filename, expectedLabel) {
-  try {
-    return await predictImageBlob(capture.blob, filename);
-  } catch (error) {
-    return fallbackPrediction(expectedLabel, error);
-  }
-}
-
-
 async function saveCaptureEvent({
   supabase,
   mission,
   challenge,
   prediction,
   decision,
+  pointsAwarded,
   proofUrl,
   fillLevelPct,
   userId,
   binId,
 }) {
+  const awardedPoints = decision.status === 'approved' ? Number(pointsAwarded ?? 0) : 0;
+
   if (!supabase) {
     return {
       persisted: false,
-      pointsAwarded: decision.status === 'approved' ? Number(mission?.points_awarded ?? 0) : 0,
+      pointsAwarded: awardedPoints,
       submissionId: null,
     };
   }
 
   const challengeId = mission?.challenge_id ?? challenge?.challenge_id ?? 'CH-001';
   const submissionId = `SUB-LEGACY-${Date.now()}`;
-  const pointsAwarded = decision.status === 'approved' ? Number(mission?.points_awarded ?? challenge?.points_value ?? 5) : 0;
 
   if (challenge) {
     const { error: challengeError } = await supabase.from('challenges').upsert({
@@ -215,7 +195,7 @@ async function saveCaptureEvent({
     }
   }
 
-  if (pointsAwarded > 0) {
+  if (awardedPoints > 0) {
     const { data: profile } = await supabase
       .from('profiles')
       .select('eco_points')
@@ -225,14 +205,14 @@ async function saveCaptureEvent({
     if (profile) {
       await supabase
         .from('profiles')
-        .update({ eco_points: Number(profile.eco_points ?? 0) + pointsAwarded })
+        .update({ eco_points: Number(profile.eco_points ?? 0) + awardedPoints })
         .eq('user_id', userId);
     }
   }
 
   return {
     persisted: true,
-    pointsAwarded,
+    pointsAwarded: awardedPoints,
     submissionId,
   };
 }
@@ -252,14 +232,22 @@ export async function GET(request) {
     const filename = `${binId}-${Date.now()}-legacy-capture.jpg`;
     const supabase = shouldPersist(request) ? maybeCreateServerSupabaseClient() : null;
     const proofUrl = await uploadProofBlob(supabase, capture.blob, userId, filename);
-    const prediction = await getPrediction(capture, filename, expectedLabel);
-    const { normalizedExpected, labelMatches, decision } = createVerificationDecision(prediction, expectedLabel);
+    const prediction = await predictImageBlob(capture.blob, filename);
+    const {
+      normalizedExpected,
+      labelMatches,
+      decision,
+      confidence,
+      confidence_pct: confidencePct,
+      points_awarded: pointsAwarded,
+    } = createVerificationDecision(prediction, expectedLabel);
     const saveResult = await saveCaptureEvent({
       supabase,
       mission,
       challenge,
       prediction,
       decision,
+      pointsAwarded,
       proofUrl,
       fillLevelPct,
       userId,
@@ -270,7 +258,8 @@ export async function GET(request) {
       ? completeMission(mission.mission_id, {
           correct,
           detected_label: prediction.label,
-          confidence_pct: prediction.confidence_pct,
+          confidence,
+          confidence_pct: confidencePct,
           expected_label: normalizedExpected,
           label_matches: labelMatches,
           decision,
@@ -289,7 +278,7 @@ export async function GET(request) {
     const classification = setLegacyCaptureResult({
       section: correct ? sectionFromWasteLabel(prediction.label) : 'UNKNOWN',
       label: prediction.label,
-      confidence_pct: prediction.confidence_pct,
+      confidence_pct: confidencePct,
       status: correct ? 'ready' : 'rejected',
       prediction,
       decision,
@@ -318,6 +307,30 @@ export async function GET(request) {
       proof_url: proofUrl,
     });
   } catch (error) {
+    const failedMission = mission && !hasCompletedLegacyMission(mission.mission_id)
+      ? completeMission(mission.mission_id, {
+          correct: false,
+          detected_label: 'unknown',
+          confidence: 0,
+          confidence_pct: 0,
+          expected_label: expectedLabel,
+          label_matches: false,
+          decision: {
+            status: 'rejected',
+            message: error.message,
+          },
+          points_awarded: 0,
+          submission_id: null,
+          bin_id: binId,
+          proof_url: null,
+        })
+      : null;
+
+    if (mission?.mission_id) {
+      markLegacyMissionCompleted(mission.mission_id);
+      setLegacySessionEnabled(false);
+    }
+
     const classification = setLegacyCaptureResult({
       section: 'UNKNOWN',
       label: 'unknown',
@@ -331,8 +344,10 @@ export async function GET(request) {
         ok: false,
         error: error.message,
         classification,
+        mission: failedMission,
+        points_awarded: 0,
       },
-      { status: 500 },
+      { status: 200 },
     );
   }
 }

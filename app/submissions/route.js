@@ -1,9 +1,6 @@
 import { NextResponse } from 'next/server';
-import {
-  submissions,
-  submissionView,
-  verificationStatusFromConfidence,
-} from '@/lib/ecoquest-data';
+import { submissions, submissionView } from '@/lib/ecoquest-data';
+import { createVerificationDecision } from '@/lib/waste-ai';
 import { maybeCreateServerSupabaseClient } from '@/lib/supabase/server';
 
 function supabaseSubmissionView(submission) {
@@ -69,7 +66,10 @@ export async function POST(request) {
   }
 
   const confidencePct = Number(body.ai_confidence_pct ?? 72);
-  const decision = verificationStatusFromConfidence(confidencePct);
+  const { decision } = createVerificationDecision(
+    { label: body.ai_label ?? 'plastic', confidence_pct: confidencePct },
+    null,
+  );
   const supabase = maybeCreateServerSupabaseClient();
 
   if (supabase) {
