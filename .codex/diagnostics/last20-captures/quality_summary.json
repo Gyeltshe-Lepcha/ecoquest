@@ -1,0 +1,40 @@
+{
+  "approved_count": 7,
+  "unrecognized_count": 12,
+  "brightness": {
+    "approved_avg": 107.12306649344308,
+    "unrecognized_avg": 82.35727262496948
+  },
+  "contrast": {
+    "approved_avg": 61.18279920305525,
+    "unrecognized_avg": 45.04448401927948
+  },
+  "sharpness_laplacian_var": {
+    "approved_avg": 61.78783416748047,
+    "unrecognized_avg": 23.24685897429784
+  },
+  "edge_density": {
+    "approved_avg": 2.032924107142857,
+    "unrecognized_avg": 0.7498101128472222
+  },
+  "dark_pixel_pct": {
+    "approved_avg": 19.143880208333336,
+    "unrecognized_avg": 51.199598524305564
+  },
+  "green_cast_ratio": {
+    "approved_avg": 1.0449572475770932,
+    "unrecognized_avg": 1.1231705798293776
+  },
+  "approx_salient_area_pct": {
+    "approved_avg": 79.69949776785714,
+    "unrecognized_avg": 43.59776475694445
+  },
+  "approx_object_bbox_pct": {
+    "approved_avg": 99.53125,
+    "unrecognized_avg": 80.36458333333333
+  },
+  "center_offset_norm": {
+    "approved_avg": 0.0046875,
+    "unrecognized_avg": 0.11988636363636364
+  }
+}

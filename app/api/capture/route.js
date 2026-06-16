@@ -47,6 +47,21 @@ async function fetchCameraCapture(captureUrl) {
     throw new Error('Missing ESP32-CAM capture URL. Set ESP32_CAM_CAPTURE_URL.');
   }
 
+  const warmupCaptures = Math.max(0, Number(process.env.ESP32_CAM_WARMUP_CAPTURES ?? 1));
+  let lastResult = null;
+
+  for (let attempt = 0; attempt <= warmupCaptures; attempt += 1) {
+    lastResult = await fetchSingleCameraCapture(captureUrl);
+
+    if (attempt < warmupCaptures) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+    }
+  }
+
+  return lastResult;
+}
+
+async function fetchSingleCameraCapture(captureUrl) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12000);
 
@@ -228,11 +243,21 @@ export async function GET(request) {
   const captureUrl = resolveCameraUrl(request);
 
   try {
+    console.log(`\n[CAPTURE] ── NEW CAPTURE ──────────────────────────`);
+    console.log(`[CAPTURE] cameraUrl=${captureUrl}`);
+    console.log(`[CAPTURE] userId=${userId} binId=${binId} expectedLabel=${expectedLabel ?? 'none'}`);
+
     const capture = await fetchCameraCapture(captureUrl);
+    console.log(`[CAPTURE] image fetched: ${capture.bytes} bytes, type=${capture.contentType}`);
+
     const filename = `${binId}-${Date.now()}-legacy-capture.jpg`;
     const supabase = shouldPersist(request) ? maybeCreateServerSupabaseClient() : null;
     const proofUrl = await uploadProofBlob(supabase, capture.blob, userId, filename);
+    console.log(`[CAPTURE] uploaded to Supabase: ${proofUrl ?? 'not persisted'}`);
+
     const prediction = await predictImageBlob(capture.blob, filename);
+    console.log(`[CAPTURE] prediction: label=${prediction.label} confidence_pct=${prediction.confidence_pct} source=${prediction.source}`);
+
     const {
       normalizedExpected,
       labelMatches,
@@ -241,6 +266,7 @@ export async function GET(request) {
       confidence_pct: confidencePct,
       points_awarded: pointsAwarded,
     } = createVerificationDecision(prediction, expectedLabel);
+    console.log(`[CAPTURE] decision: status=${decision.status} label=${prediction.label} points=${pointsAwarded} labelMatches=${labelMatches}`);
     const saveResult = await saveCaptureEvent({
       supabase,
       mission,
@@ -275,8 +301,12 @@ export async function GET(request) {
       setLegacySessionEnabled(false);
     }
 
+    const section = correct ? sectionFromWasteLabel(prediction.label) : 'UNKNOWN';
+    console.log(`[CAPTURE] correct=${correct} → section=${section}`);
+    console.log(`[CAPTURE] ── END ────────────────────────────────────\n`);
+
     const classification = setLegacyCaptureResult({
-      section: correct ? sectionFromWasteLabel(prediction.label) : 'UNKNOWN',
+      section,
       label: prediction.label,
       confidence_pct: confidencePct,
       status: correct ? 'ready' : 'rejected',
@@ -307,6 +337,9 @@ export async function GET(request) {
       proof_url: proofUrl,
     });
   } catch (error) {
+    console.error(`[CAPTURE] ── ERROR ──────────────────────────────────`);
+    console.error(`[CAPTURE] ${error.message}`);
+    console.error(`[CAPTURE] ── END ────────────────────────────────────\n`);
     const failedMission = mission && !hasCompletedLegacyMission(mission.mission_id)
       ? completeMission(mission.mission_id, {
           correct: false,
