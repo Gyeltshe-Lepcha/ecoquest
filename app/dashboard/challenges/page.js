@@ -258,24 +258,22 @@ function QuestNode({ challenge, index, state, activeMission, onClick, isNextUp }
       {/* Points worth badge — always visible above each node */}
       <div
         className="absolute left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border-2 border-amber-200 bg-white/95 px-2.5 py-1 shadow-md backdrop-blur-sm"
-        style={{ top: current ? '-152px' : '-52px' }}
+        style={{ top: current && isNextUp ? '-152px' : '-52px' }}
       >
         <Coins className="h-3 w-3 text-amber-500" />
         <span className="text-[11px] font-black text-amber-700">{milestone.toLocaleString()} pts</span>
       </div>
 
-      {current && (
+      {current && isNextUp && (
         <motion.div
-          className={`absolute left-1/2 top-[-82px] w-36 -translate-x-1/2 rounded-2xl border-4 px-3 py-2 text-center text-white shadow-xl ${isNextUp ? 'border-emerald-400 bg-emerald-600' : 'border-pink-300 bg-slate-800'}`}
+          className="absolute left-1/2 top-[-82px] w-36 -translate-x-1/2 rounded-2xl border-4 border-emerald-400 bg-emerald-600 px-3 py-2 text-center text-white shadow-xl"
           initial={{ y: 8, opacity: 0 }}
-          animate={isNextUp ? { y: [0, -5, 0], opacity: 1 } : { y: 0, opacity: 1 }}
-          transition={isNextUp ? { repeat: Infinity, duration: 0.7, ease: 'easeInOut' } : undefined}
+          animate={{ y: [0, -5, 0], opacity: 1 }}
+          transition={{ repeat: Infinity, duration: 0.7, ease: 'easeInOut' }}
         >
-          <p className={`text-[10px] font-black uppercase tracking-[1.3px] ${isNextUp ? 'text-emerald-100' : 'text-pink-200'}`}>
-            {isNextUp ? 'Unlocked!' : 'You are here'}
-          </p>
+          <p className="text-[10px] font-black uppercase tracking-[1.3px] text-emerald-100">Unlocked!</p>
           <p className="text-sm font-black">Reach {milestone.toLocaleString()}</p>
-          <div className={`absolute left-1/2 top-full h-4 w-4 -translate-x-1/2 -translate-y-2 rotate-45 border-b-4 border-r-4 ${isNextUp ? 'border-emerald-400 bg-emerald-600' : 'border-pink-300 bg-slate-800'}`} />
+          <div className="absolute left-1/2 top-full h-4 w-4 -translate-x-1/2 -translate-y-2 rotate-45 border-b-4 border-r-4 border-emerald-400 bg-emerald-600" />
         </motion.div>
       )}
 
@@ -291,7 +289,7 @@ function QuestNode({ challenge, index, state, activeMission, onClick, isNextUp }
         </p>
         {!locked && (
           <p className="mt-1 text-[11px] font-bold text-emerald-900/70">
-            Goal {milestone.toLocaleString()} EcoPoints
+            {/* Goal {milestone.toLocaleString()} EcoPoints */}
           </p>
         )}
       </div>
@@ -320,6 +318,16 @@ function QuestMap({
   const allCompleted = items.every((challenge) => challenge.status === 'completed');
   const completedCount = items.filter((c) => c.status === 'completed').length;
   const pathProgress = completedCount / items.length;
+  const markerPathRef = useRef(null);
+  const [markerPos, setMarkerPos] = useState(null);
+  const maxPoints = Math.max(...items.map(getMilestonePoints), 1);
+  const markerProgress = Math.min(1, totalPoints / maxPoints);
+  useEffect(() => {
+    if (!markerPathRef.current) return;
+    const len = markerPathRef.current.getTotalLength();
+    const pt = markerPathRef.current.getPointAtLength(markerProgress * len);
+    setMarkerPos({ x: pt.x, y: pt.y });
+  }, [markerProgress]);
   const nextHighlightIndex = completedChallengeNotice
     ? items.findIndex((c) => c.status !== 'completed')
     : -1;
@@ -403,6 +411,7 @@ function QuestMap({
 
         <svg className="absolute inset-0 h-full w-full" viewBox="0 0 1100 740" preserveAspectRatio="none" aria-hidden="true">
           <path
+            ref={markerPathRef}
             d="M132 592 C220 566, 274 462, 374 444 C430 426, 568 324, 660 311 C752 298, 848 176, 902 163"
             fill="none"
             stroke="#b7793d"
@@ -432,6 +441,20 @@ function QuestMap({
         </svg>
 
         <FlyingCoins reward={latestReward} />
+
+        {markerPos && (
+          <motion.div
+            className="absolute z-20 pointer-events-none"
+            style={{ transform: 'translate(-50%, -100%)' }}
+            animate={{
+              left: `${(markerPos.x / 1100) * 100}%`,
+              top: `${(markerPos.y / 740) * 100}%`,
+            }}
+            transition={{ duration: 0.9, ease: 'easeOut' }}
+          >
+            <img src="/icons/navigation.png" alt="You Are Here" className="h-16 w-16 drop-shadow-lg" />
+          </motion.div>
+        )}
 
         {items.map((challenge, index) => (
           <QuestNode
@@ -555,7 +578,19 @@ function QuestMap({
 }
 
 
+function getStoredUserId() {
+  if (typeof window === 'undefined') return 'USR-0042';
+  try {
+    const stored = localStorage.getItem('ecoquest_user');
+    const user = stored ? JSON.parse(stored) : null;
+    return user?.user_id || 'USR-0042';
+  } catch {
+    return 'USR-0042';
+  }
+}
+
 export default function ChallengesPage() {
+  const [currentUserId] = useState(getStoredUserId);
   const [items, setItems] = useState(() => milestoneItems(0));
   const [selectedChallenge, setSelectedChallenge] = useState(null);
   const [activeMission, setActiveMission] = useState(null);
@@ -576,7 +611,7 @@ export default function ChallengesPage() {
 
   async function loadDashboardData() {
     try {
-      const response = await fetch('/api/iot/dashboard', { cache: 'no-store' });
+      const response = await fetch(`/api/iot/dashboard?user_id=${currentUserId}`, { cache: 'no-store' });
       const result = await response.json().catch(() => ({}));
 
       if (!response.ok) {
@@ -742,7 +777,7 @@ export default function ChallengesPage() {
     setCompletedChallengeNotice(null);
     setActiveMission({
       mission_id: null,
-      user_id: 'USR-0042',
+      user_id: currentUserId,
       challenge_id: challenge.challenge_id,
       challenge_title: challenge.title,
       expected_label: expectedLabel,
@@ -761,7 +796,7 @@ export default function ChallengesPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: 'USR-0042',
+          user_id: currentUserId,
           challenge_id: challenge.challenge_id,
           expected_label: expectedLabel,
           bin_id: 'BIN-001',
@@ -778,7 +813,7 @@ export default function ChallengesPage() {
       setMissionError(error.message);
       setActiveMission({
         mission_id: null,
-        user_id: 'USR-0042',
+        user_id: currentUserId,
         challenge_id: challenge.challenge_id,
         challenge_title: challenge.title,
         expected_label: expectedLabel,

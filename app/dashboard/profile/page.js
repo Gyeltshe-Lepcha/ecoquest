@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Award, BadgeCheck, Building2, Camera, Flame, Leaf, Pencil, Save, Trophy, UserRound } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -11,12 +11,71 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { badgeCollection, campuses, users } from '@/lib/ecoquest-data';
+import { badgeCollection, campuses } from '@/lib/ecoquest-data';
 
-const user = users[0];
+function getStoredUser() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = localStorage.getItem('ecoquest_user');
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function ProfilePage() {
   const [editing, setEditing] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    async function loadProfile() {
+      const storedUser = getStoredUser();
+      const userId = storedUser?.user_id;
+
+      if (!userId) {
+        setError('No user session found. Please log in again.');
+        setLoading(false);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/profile?user_id=${userId}`, { cache: 'no-store' });
+        const data = await response.json().catch(() => ({}));
+
+        if (!response.ok) {
+          throw new Error(data.error || 'Could not load profile.');
+        }
+
+        setProfile(data);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadProfile();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24 text-muted-foreground text-sm">
+        Loading profile…
+      </div>
+    );
+  }
+
+  if (error || !profile) {
+    return (
+      <div className="flex items-center justify-center py-24 text-destructive text-sm">
+        {error || 'Profile not found.'}
+      </div>
+    );
+  }
+
+  const ecoPoints = Number(profile.eco_points ?? 0);
 
   return (
     <div className="space-y-6">
@@ -30,7 +89,7 @@ export default function ProfilePage() {
           <div className="flex items-center gap-4">
             <div className="relative">
               <Avatar className="h-20 w-20 border-4 border-background shadow-lg">
-                <AvatarFallback className="bg-primary text-xl text-primary-foreground">{user.avatar}</AvatarFallback>
+                <AvatarFallback className="bg-primary text-xl text-primary-foreground">{profile.avatar}</AvatarFallback>
               </Avatar>
               <button className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border border-border bg-card shadow-sm">
                 <Camera className="h-4 w-4 text-primary" />
@@ -38,17 +97,16 @@ export default function ProfilePage() {
             </div>
             <div>
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-bold">{user.name}</h1>
+                <h1 className="text-2xl font-bold">{profile.name}</h1>
                 <Badge className="gap-1 bg-primary/10 text-primary hover:bg-primary/10">
                   <BadgeCheck className="h-3.5 w-3.5" />
                   Verified user
                 </Badge>
               </div>
-              <p className="mt-1 text-muted-foreground">{user.campus} / {user.hostel}</p>
+              <p className="mt-1 text-muted-foreground">{profile.campus}</p>
               <div className="mt-3 flex flex-wrap gap-2 text-sm">
-                <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">{user.total_points.toLocaleString()} points</span>
-                <span className="rounded-full bg-accent/10 px-3 py-1 text-accent">{user.streak_days}-day streak</span>
-                <span className="rounded-full bg-chart-4/10 px-3 py-1 text-chart-4">Rank #12 CST</span>
+                <span className="rounded-full bg-primary/10 px-3 py-1 text-primary">{ecoPoints.toLocaleString()} points</span>
+                <span className="rounded-full bg-accent/10 px-3 py-1 text-accent">{profile.streak_days}-day streak</span>
               </div>
             </div>
           </div>
@@ -63,26 +121,26 @@ export default function ProfilePage() {
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle className="text-base">Profile Details</CardTitle>
-            <CardDescription>Name, contact, campus, and hostel information from the SRS profile model.</CardDescription>
+            <CardDescription>Name, contact, and campus information.</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="name">Full name</Label>
-              <Input id="name" defaultValue={user.name} disabled={!editing} />
+              <Input id="name" defaultValue={profile.name} disabled={!editing} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" defaultValue={user.email} disabled={!editing} />
+              <Input id="email" defaultValue={profile.email} disabled={!editing} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" defaultValue={user.phone} disabled={!editing} />
+              <Input id="phone" defaultValue={profile.phone} disabled={!editing} />
             </div>
             <div className="space-y-2">
               <Label>Campus</Label>
               <Select disabled={!editing} defaultValue="cst">
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder={profile.campus} />
                 </SelectTrigger>
                 <SelectContent>
                   {campuses.map((campus) => (
@@ -93,24 +151,20 @@ export default function ProfilePage() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="hostel">Hostel / location group</Label>
-              <Input id="hostel" defaultValue={user.hostel} disabled={!editing} />
-            </div>
           </CardContent>
         </Card>
 
         <Card className="border-border/50">
           <CardHeader>
             <CardTitle className="text-base">Impact Snapshot</CardTitle>
-            <CardDescription>Fast progress signals for a first-time user.</CardDescription>
+            <CardDescription>Your personal progress signals.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             {[
-              { label: 'Challenges complete', value: '47', icon: Trophy, color: 'text-primary' },
-              { label: 'Current streak', value: `${user.streak_days} days`, icon: Flame, color: 'text-accent' },
-              { label: 'Waste diverted', value: '12.5 kg', icon: Leaf, color: 'text-chart-5' },
-              { label: 'Campus group', value: 'Kuenphen', icon: Building2, color: 'text-chart-4' },
+              { label: 'EcoPoints earned', value: ecoPoints.toLocaleString(), icon: Trophy, color: 'text-primary' },
+              { label: 'Current streak', value: `${profile.streak_days} days`, icon: Flame, color: 'text-accent' },
+              { label: 'Level', value: `Level ${profile.level ?? 1}`, icon: Leaf, color: 'text-chart-5' },
+              { label: 'Campus', value: profile.campus || '—', icon: Building2, color: 'text-chart-4' },
             ].map((item) => (
               <div key={item.label} className="flex items-center justify-between rounded-lg border border-border/60 p-3">
                 <div className="flex items-center gap-3">
@@ -130,7 +184,7 @@ export default function ProfilePage() {
             <Award className="h-5 w-5 text-accent" />
             Badge Collection
           </CardTitle>
-          <CardDescription>Milestones are shown on the profile as required by the SRS.</CardDescription>
+          <CardDescription>Milestones unlocked through your EcoPoints.</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
           {badgeCollection.map((badge, index) => (

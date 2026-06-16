@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { challengeById } from '@/lib/ecoquest-data';
 import {
   completeMission,
+  getMission,
   getWaitingMissionForUser,
 } from '@/lib/iot-missions';
 import {
@@ -196,18 +197,10 @@ async function saveCaptureEvent({
   }
 
   if (awardedPoints > 0) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('eco_points')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (profile) {
-      await supabase
-        .from('profiles')
-        .update({ eco_points: Number(profile.eco_points ?? 0) + awardedPoints })
-        .eq('user_id', userId);
-    }
+    await supabase.rpc('increment_eco_points', {
+      p_user_id: userId,
+      p_amount: awardedPoints,
+    });
   }
 
   return {
@@ -219,8 +212,15 @@ async function saveCaptureEvent({
 
 export async function GET(request) {
   const state = getLegacyDevkitState();
-  const userId = DEFAULT_LEGACY_USER_ID;
-  const mission = getWaitingMissionForUser(userId);
+  const { searchParams } = new URL(request.url);
+  const requestedUserId = searchParams.get('user_id') ?? searchParams.get('userId') ?? DEFAULT_LEGACY_USER_ID;
+  const storedMission = state.active_mission_id
+    ? getMission(state.active_mission_id)
+    : null;
+  const mission = storedMission?.status === 'waiting'
+    ? storedMission
+    : getWaitingMissionForUser(requestedUserId);
+  const userId = mission?.user_id ?? requestedUserId;
   const challenge = challengeById(mission?.challenge_id ?? 'CH-001');
   const expectedLabel = mission?.expected_label ?? expectedLabelFromChallenge(challenge);
   const binId = mission?.bin_id ?? DEFAULT_LEGACY_BIN_ID;

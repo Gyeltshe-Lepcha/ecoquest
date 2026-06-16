@@ -1,20 +1,22 @@
 import { NextResponse } from 'next/server';
 import { maybeCreateServerSupabaseClient } from '@/lib/supabase/server';
 
-const labels = ['plastic', 'paper', 'bottle', 'unknown'];
+const labels = ['can', 'bottle', 'plastic', 'paper', 'unrecognized'];
 
 function emptyCounts() {
   return {
     total: 0,
+    can: 0,
+    bottle: 0,
     plastic: 0,
     paper: 0,
-    bottle: 0,
-    unknown: 0,
+    unrecognized: 0,
   };
 }
 
-export async function GET() {
-  const userId = 'USR-0042';
+export async function GET(request) {
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('user_id') || 'USR-0042';
   const supabase = maybeCreateServerSupabaseClient();
 
   if (!supabase) {
@@ -22,7 +24,7 @@ export async function GET() {
       connected: false,
       counts: emptyCounts(),
       latest: null,
-      profile: { user_id: userId, eco_points: 320 },
+      profile: { user_id: userId, eco_points: 0 },
     });
   }
 
@@ -48,7 +50,7 @@ export async function GET() {
 
   const counts = emptyCounts();
   for (const row of data) {
-    const label = labels.includes(row.waste_label) ? row.waste_label : 'unknown';
+    const label = labels.includes(row.waste_label) ? row.waste_label : 'unrecognized';
     counts[label] += 1;
     counts.total += 1;
   }
@@ -68,6 +70,6 @@ export async function GET() {
     connected: true,
     counts,
     latest,
-    profile: profile ?? { user_id: userId, eco_points: 320 },
+    profile: profile ?? { user_id: userId, eco_points: 0 },
   });
 }

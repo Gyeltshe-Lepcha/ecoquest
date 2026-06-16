@@ -128,6 +128,14 @@ create table if not exists public.campus_insights (
   created_at timestamptz not null default now()
 );
 
+-- Atomically adds points to a user's profile, avoiding read-modify-write races.
+create or replace function increment_eco_points(p_user_id text, p_amount int)
+returns void language sql security definer as $$
+  update public.profiles
+  set eco_points = eco_points + p_amount
+  where user_id = p_user_id;
+$$;
+
 insert into storage.buckets (id, name, public)
 values ('proof-images', 'proof-images', false)
 on conflict (id) do nothing;

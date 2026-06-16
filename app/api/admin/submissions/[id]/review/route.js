@@ -5,7 +5,7 @@ import { POINTS_BY_LABEL } from '@/lib/waste-ai';
 import { logActivity } from '@/lib/admin-activity';
 
 function pointsForLabel(label) {
-  return POINTS_BY_LABEL[String(label ?? '').toLowerCase()] ?? 10;
+  return POINTS_BY_LABEL[String(label ?? '').toLowerCase()] ?? 0;
 }
 
 export async function POST(request, { params }) {
@@ -22,7 +22,7 @@ export async function POST(request, { params }) {
   if (supabase) {
     const { data: submission, error: fetchError } = await supabase
       .from('submissions')
-      .select('*, challenges(title, points_value), profiles(eco_points, name)')
+      .select('*, challenges(title, points_value), profiles(name)')
       .eq('submission_id', id)
       .single();
 
@@ -57,11 +57,10 @@ export async function POST(request, { params }) {
     if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
 
     if (pointsToAward > 0) {
-      const currentPoints = Number(submission.profiles?.eco_points ?? 0);
-      await supabase
-        .from('profiles')
-        .update({ eco_points: currentPoints + pointsToAward })
-        .eq('user_id', submission.user_id);
+      await supabase.rpc('increment_eco_points', {
+        p_user_id: submission.user_id,
+        p_amount: pointsToAward,
+      });
     }
 
     const eventType = action === 'approve' ? 'submission_approved' : 'submission_rejected';

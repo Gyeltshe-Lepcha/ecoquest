@@ -1,23 +1,31 @@
-# EcoQuest AI Model Service
+# EcoQuest AI — Gemini Vision
 
-Your trained file `C:/Users/Lenovo/Downloads/waste_model2.h5` should not be stored in Supabase. Supabase stores the app data: proof image URL, predicted waste type, confidence, review status, points, bins, users, badges, and leaderboard rows.
+Waste classification is handled by **Gemini 2.5 Flash Lite** (Google AI), called directly
+from the Next.js server. No Python service or local model file is required.
 
-Use this service when you are ready to connect real AI verification:
+## Setup
 
-1. Copy the model into `D:/EcoQuest/ai/models/waste_model2.h5`.
-2. Create and activate a Python virtual environment.
-3. Install the dependencies from `ai/requirements.txt`.
-4. Run `python ai/inference_service.py`.
-5. Keep `AI_INFERENCE_URL=http://127.0.0.1:8000` in `.env.local`.
+1. Get a free API key at Google AI Studio.
+2. Add it to `.env`:
+   ```
+   GEMINI_API_KEY=your_key_here
+   GEMINI_MODEL=gemini-2.5-flash-lite
+   ```
+3. Restart `npm run dev`.
 
-The Next.js route `POST /api/verify` will send uploaded proof images to this service, receive `{ label, confidence_pct }`, and save the result to Supabase when Supabase credentials are configured.
+The classification runs automatically inside `GET /api/capture` whenever the
+ESP32-CAM captures an image. The result flows back to the dashboard within ~1 second.
 
-If your model uses different class names, set:
+## Supported waste classes
 
-```powershell
-$env:WASTE_MODEL_LABELS = "paper,plastic,bottle,unknown"
-```
+| Label   | EcoPoints |
+|---------|-----------|
+| bottle  | 25        |
+| paper   | 20        |
+| plastic | 15        |
+| can     | 30        |
 
-The current `waste_model2.h5` file outputs 3 classes. With the labels above, EcoQuest maps those outputs to `paper`, `plastic`, and `bottle`, then uses `unknown` when the top confidence is below `UNKNOWN_CONFIDENCE_THRESHOLD` 50 by default. If you retrain the model with 4 output classes, the service will map all four labels directly.
+## Files
 
-If your model needs special preprocessing beyond resize + RGB + 0-1 scaling, update `preprocess_image()` in `ai/inference_service.py`.
+- `devkit_firmware.ino` — ESP32 DevKit firmware (upload via Arduino IDE)
+- `models/` — reserved for future local model (currently empty)

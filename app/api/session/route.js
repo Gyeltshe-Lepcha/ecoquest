@@ -1,4 +1,4 @@
-import { getWaitingMissionForUser } from '@/lib/iot-missions';
+import { getMission, getWaitingMissionForUser } from '@/lib/iot-missions';
 import {
   DEFAULT_LEGACY_USER_ID,
   getLegacyDevkitState,
@@ -9,11 +9,14 @@ export const runtime = 'nodejs';
 
 export async function GET() {
   const state = getLegacyDevkitState();
-  const mission = state.active_mission_id
+  const storedMission = state.active_mission_id
+    ? getMission(state.active_mission_id)
+    : null;
+  const fallbackMission = storedMission
     ? null
     : getWaitingMissionForUser(DEFAULT_LEGACY_USER_ID);
-  const activeMission = mission ?? getWaitingMissionForUser(DEFAULT_LEGACY_USER_ID);
-  const enabled = Boolean(activeMission);
+  const activeMission = storedMission ?? fallbackMission;
+  const enabled = activeMission?.status === 'waiting';
 
   if (!enabled && state.enabled) {
     setLegacySessionEnabled(false);

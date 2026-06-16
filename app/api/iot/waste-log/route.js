@@ -237,18 +237,10 @@ async function saveIotEvent({
   }
 
   if (awardedPoints > 0) {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('eco_points')
-      .eq('user_id', userId)
-      .maybeSingle();
-
-    if (profile) {
-      await supabase
-        .from('profiles')
-        .update({ eco_points: Number(profile.eco_points ?? 0) + awardedPoints })
-        .eq('user_id', userId);
-    }
+    await supabase.rpc('increment_eco_points', {
+      p_user_id: userId,
+      p_amount: awardedPoints,
+    });
   }
 
   return {
